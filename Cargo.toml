@@ -6,7 +6,7 @@ license = "MIT"
 description = "Generates Sudoku boards using the dancing links algorithm"
 readme = "README.md"
 repository = "https://github.com/ArmanDris/dancing_links_sudoku"
-keywords = ["sudoku", "dancing", "links", "algorithm x", "exact cover"]
+keywords = ["sudoku", "dancing_links", "algorithm_x", "exact_cover"]
 categories = ["algorithms"]
 
 [dependencies]
