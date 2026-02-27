@@ -56,10 +56,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_greets() {
-        let mut greeter = Board::new();
-        greeter.set(0, 5, 1);
-        assert_eq!(greeter.get(0, 5), 1);
+    fn it_sets() {
+        let mut board = Board::new();
+        board.set(0, 5, 1);
+        assert_eq!(board.get(0, 5), 1);
     }
 
     #[test]
