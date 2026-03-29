@@ -1,6 +1,9 @@
-use std::{array, collections, mem::MaybeUninit};
+use std::array;
 
-use crate::algorithm_x::ConstraintTable;
+use crate::{
+    Board,
+    algorithm_x::{ConstraintTable, generate_constraint_table},
+};
 
 #[cfg(test)]
 #[path = "dancing_links_test.rs"]
@@ -53,9 +56,15 @@ impl Default for LinkedTable {
                 Err(_err) => panic!("unable to initialize empty dancing link table"),
             };
 
-        Self {
+        let constraint_table = generate_constraint_table();
+        let mut linked_table = Self {
             table: typed_boxed_table,
-        }
+        };
+
+        linked_table.table[0] = generate_column_headers(&constraint_table);
+        linked_table.table[1..].clone_from_slice(&*generate_unlinked_rows(&constraint_table));
+
+        linked_table
     }
 }
 
@@ -112,8 +121,8 @@ fn generate_unlinked_rows(constraint_table: &ConstraintTable) -> Box<[[Link; 324
     linked_arm
 }
 
-fn link_linked_table(linked_table: &mut LinkedTable) -> () {
-    // This for loop will link each row one after another
+fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
+    // This for loop will link each row together, then each column together
 
     let table = &mut linked_table.table;
     for row_index in 0..730 {
@@ -175,12 +184,70 @@ fn link_linked_table(linked_table: &mut LinkedTable) -> () {
             Link::Cell(cell) => cell.right = Some(first_link_index),
         };
     }
+
+    // Linking each column's cells together
+    for column_index in 0..LINKED_TABLE_COLUMNS {
+        let mut first_link_index: Option<usize> = None;
+        let mut last_link_index: Option<usize> = None;
+
+        for row_index in 0..LINKED_TABLE_ROWS {
+            if table[row_index][column_index] == Link::EmptyLink {
+                continue;
+            }
+
+            match first_link_index {
+                Some(_) => (),
+                None => {
+                    first_link_index = Some(row_index);
+                    last_link_index = Some(row_index);
+                    continue;
+                }
+            };
+
+            match &mut table[row_index][column_index] {
+                Link::EmptyLink => (),
+                Link::ColumnHeader(column_header) => column_header.up = last_link_index,
+                Link::Cell(cell) => cell.up = last_link_index,
+            };
+
+            match &mut table[last_link_index.unwrap()][column_index] {
+                Link::EmptyLink => (),
+                Link::ColumnHeader(column_header) => column_header.down = Some(row_index),
+                Link::Cell(cell) => cell.down = Some(row_index),
+            };
+
+            last_link_index = Some(row_index);
+        }
+
+        if first_link_index.is_none() || last_link_index.is_none() {
+            panic!(
+                "first_link_index, or last_link_index was never initialized, this is a bad start, aborting table creation"
+            );
+        }
+        let first_link_index = first_link_index.unwrap();
+        let last_link_index = last_link_index.unwrap();
+
+        match &mut table[first_link_index][column_index] {
+            Link::EmptyLink => (),
+            Link::ColumnHeader(column_header) => column_header.up = Some(last_link_index),
+            Link::Cell(cell) => cell.up = Some(last_link_index),
+        };
+
+        match &mut table[last_link_index][column_index] {
+            Link::EmptyLink => (),
+            Link::ColumnHeader(column_header) => column_header.down = Some(first_link_index),
+            Link::Cell(cell) => cell.down = Some(first_link_index),
+        };
+    }
 }
 
 fn generate_linked_table() -> LinkedTable {
-    LinkedTable::default()
+    let mut table = LinkedTable::default();
+    link_unlinked_table(&mut table);
+    table
 }
 
-pub fn launch_dancing_links() {
-    ()
+pub fn launch_dancing_links() -> Vec<Board> {
+    let linked_table = generate_linked_table();
+    vec![]
 }
