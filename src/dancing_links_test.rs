@@ -209,3 +209,390 @@ fn it_links_the_columns_in_an_uninitlized_table() {
         assert!(ptr::eq(first_cell, tenth_link));
     }
 }
+
+#[test]
+fn it_hides_column_headers() {
+    let mut linked_table = LinkedTable::default();
+    link_unlinked_table(&mut linked_table);
+
+    let original_right = match linked_table.table[0][18] {
+        Link::ColumnHeader(ch) => ch.right,
+        _ => panic!("invalid"),
+    };
+
+    let original_left = match linked_table.table[0][20] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(_) => panic!("invalid"),
+        Link::ColumnHeader(ch) => ch.left,
+    };
+
+    assert_eq!(original_right, Some(19));
+    assert_eq!(original_left, Some(19));
+
+    hide_column_header(19, &mut linked_table);
+    hide_column_header(19, &mut linked_table);
+
+    let new_right = match linked_table.table[0][18] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(_) => panic!("invalid"),
+        Link::ColumnHeader(ch) => ch.right,
+    };
+
+    let new_left = match linked_table.table[0][20] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(_) => panic!("invalid"),
+        Link::ColumnHeader(ch) => ch.left,
+    };
+
+    assert_eq!(new_right, Some(20));
+    assert_eq!(new_left, Some(18));
+}
+
+#[test]
+fn it_hides_a_cell() {
+    // Original linked table column 50 looks like this:
+    // ... | 0   (Down 411)  (Up 483) | ...
+    // ... | ...                     | ...
+    // ... | 411 (Down 0)   (Up 420) | ...
+    // ... | ...                     | ...
+    // ... | 420 (Down 429) (Up 411) | ...
+
+    // After popping row 411, index 50 it shoud look like this:
+    // ... | 0   (Down 420) (Up 483) | ...
+    // ... | ...                     | ...
+    // ... | 411 (Down 0)   (Up 420) | ...
+    // ... | ...                     | ...
+    // ... | 420 (Down 0)   (Up 411) | ...
+    let mut linked_table = LinkedTable::default();
+    link_unlinked_table(&mut linked_table);
+
+    let ch = match linked_table.table[0][50] {
+        Link::EmptyLink => panic!(),
+        Link::Cell(_) => panic!(),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    let c_two = match linked_table.table[411][50] {
+        Link::EmptyLink => panic!(),
+        Link::ColumnHeader(_) => panic!(),
+        Link::Cell(c) => c,
+    };
+
+    let c_three = match linked_table.table[420][50] {
+        Link::EmptyLink => panic!(),
+        Link::ColumnHeader(_) => panic!(),
+        Link::Cell(c) => c,
+    };
+
+    assert_eq!(ch.down, Some(411));
+    assert_eq!(c_two.up, Some(0));
+    assert_eq!(c_two.down, Some(420));
+    assert_eq!(c_three.up, Some(411));
+
+    hide_cell(411, 50, &mut linked_table);
+
+    let ch_after = match linked_table.table[0][50] {
+        Link::EmptyLink => panic!(),
+        Link::Cell(_) => panic!(),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    let c_two_after = match linked_table.table[411][50] {
+        Link::EmptyLink => panic!(),
+        Link::ColumnHeader(_) => panic!(),
+        Link::Cell(c) => c,
+    };
+
+    let c_three_after = match linked_table.table[420][50] {
+        Link::EmptyLink => panic!(),
+        Link::ColumnHeader(_) => panic!(),
+        Link::Cell(c) => c,
+    };
+    assert_eq!(ch_after.down, Some(420));
+    assert_eq!(c_two_after.up, Some(0));
+    assert_eq!(c_two_after.down, Some(420));
+    assert_eq!(c_three_after.up, Some(0));
+    assert_eq!(ch_after.cell_count + 1, ch.cell_count);
+}
+
+#[test]
+fn it_covers_a_column() {
+    // When given this as input, and instruction to hide column 0
+    //  ||        ||        ||
+    //  v|        v|        v|
+    // ______    ______    ______
+    // | ch | -> | ch | -> | ch |
+    // | 0  | <- | 1  | <- | 2  |
+    // |cc:2|    |cc:2|    |cc:2|
+    // ------    ------    ------
+    //
+    //  |^        |^        |^
+    //  v|        v|        v|
+    //
+    // ______    ______    ______
+    // | c  | -> | c  | -> | c  |
+    // | 0  | <- | 1  | <- | 2  |
+    // ------    ------    ------
+    //
+    //  |^        |^        |^
+    //  v|        ||        ||
+    //
+    // ______    ______    ______
+    // | c  | -> |    | -> |    |
+    // | 0  | <- |    | <- |    |
+    // ------    ------    ------
+    //
+    //  |^        ||        ||
+    //  ||        v|        v|
+    //  ||
+    // _||___    ______    ______
+    // |    | -> | c  | -> | c  |
+    // |    | <- | 1  | <- | 2  |
+    // -||---    ------    ------
+    //  ||        |^        |^
+    //  ||        ||        ||
+
+    // It should output:
+    //  ||        ||        ||
+    //  v|        v|  /----------
+    // ______    ______    ______ \
+    // | ch |    | ch | -> | ch | /
+    // | 0  |  / | 1  | <- | 2  |
+    // |cc:2|    |cc:1|    |cc:1|
+    // ------  | ------    ------
+    //          -----------/
+    //  |^        |^        |^
+    //  v|        ||        ||
+    //            ||        ||
+    // ______    _||___    _||___
+    // | c  | -> | c  | -> | c  |
+    // | 0  | <- | 1  | <- | 2  |
+    // ------    -||---    -||---
+    //            ||        ||
+    //  |^        ||        ||
+    //  v|        ||        ||
+    //            ||        ||
+    // ______    _||___    _||___
+    // | c  | -> |    | -> |    |
+    // | 0  | <- |    | <- |    |
+    // ------    -||---    -||---
+    //            ||        ||
+    //  |^        ||        ||
+    //  ||        v|        v|
+    //  ||
+    // _||___    ______    ______
+    // |    | -> | c  | -> | c  |
+    // |    | <- | 1  | <- | 2  |
+    // -||----    ------    ------
+    //  ||        |^        |^
+    //  ||        ||        ||
+    //
+
+    let mut linked_table = LinkedTable::default();
+    // Here im just gonna manually hook this table up for the test
+    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(2),
+        down: Some(1),
+        right: Some(1),
+        left: Some(2),
+    });
+
+    linked_table.table[0][1] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        right: Some(2),
+        left: Some(0),
+        up: Some(3),
+        down: Some(1),
+    });
+
+    linked_table.table[0][2] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        right: Some(0),
+        left: Some(1),
+        up: Some(3),
+        down: Some(1),
+    });
+    // Second row
+    linked_table.table[1][0] = Link::Cell(Cell {
+        row_index: 1,
+        column_index: 0,
+        right: Some(1),
+        left: Some(2),
+        up: Some(0),
+        down: Some(2),
+    });
+    linked_table.table[1][1] = Link::Cell(Cell {
+        row_index: 1,
+        column_index: 1,
+        right: Some(2),
+        left: Some(0),
+        up: Some(0),
+        down: Some(3),
+    });
+    linked_table.table[1][2] = Link::Cell(Cell {
+        row_index: 1,
+        column_index: 2,
+        right: Some(0),
+        left: Some(1),
+        up: Some(0),
+        down: Some(3),
+    });
+    // Third row
+    linked_table.table[2][0] = Link::Cell(Cell {
+        row_index: 2,
+        column_index: 0,
+        right: Some(0),
+        left: Some(0),
+        up: Some(1),
+        down: Some(0),
+    });
+    // Fourth row
+    linked_table.table[3][1] = Link::Cell(Cell {
+        row_index: 3,
+        column_index: 1,
+        left: Some(2),
+        right: Some(2),
+        up: Some(1),
+        down: Some(0),
+    });
+    linked_table.table[3][2] = Link::Cell(Cell {
+        row_index: 3,
+        column_index: 2,
+        left: Some(1),
+        right: Some(1),
+        up: Some(1),
+        down: Some(0),
+    });
+
+    // TODO! Make the initial assetions then act and make the updated
+    // assertions
+    assert_eq!(
+        linked_table.table[0][0],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            left: Some(2),
+            right: Some(1),
+            up: Some(2),
+            down: Some(1)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][1],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(3),
+            down: Some(1),
+            left: Some(0),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][2],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(3),
+            down: Some(1),
+            left: Some(1),
+            right: Some(0)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][1],
+        Link::Cell(Cell {
+            column_index: 1,
+            row_index: 3,
+            up: Some(1),
+            down: Some(0),
+            left: Some(2),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][2],
+        Link::Cell(Cell {
+            column_index: 2,
+            row_index: 3,
+            up: Some(1),
+            down: Some(0),
+            left: Some(1),
+            right: Some(1),
+        })
+    );
+    cover_column(0, &mut linked_table);
+    assert_eq!(
+        linked_table.table[0][0],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(2),
+            down: Some(1),
+            left: Some(2),
+            right: Some(1)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][1],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(3),
+            down: Some(3),
+            left: Some(2),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][2],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(3),
+            down: Some(3),
+            left: Some(1),
+            right: Some(1)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][1],
+        Link::Cell(Cell {
+            column_index: 1,
+            row_index: 3,
+            up: Some(0),
+            down: Some(0),
+            left: Some(2),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][2],
+        Link::Cell(Cell {
+            column_index: 2,
+            row_index: 3,
+            up: Some(0),
+            down: Some(0),
+            left: Some(1),
+            right: Some(1)
+        })
+    );
+    // Make sure the cells in the hidden column (0) are unchanged
+    assert_eq!(
+        linked_table.table[1][0],
+        Link::Cell(Cell {
+            column_index: 0,
+            row_index: 1,
+            up: Some(0),
+            down: Some(2),
+            left: Some(2),
+            right: Some(1),
+        })
+    );
+    assert_eq!(
+        linked_table.table[2][0],
+        Link::Cell(Cell {
+            column_index: 0,
+            row_index: 2,
+            up: Some(1),
+            down: Some(0),
+            left: Some(0),
+            right: Some(0),
+        })
+    );
+}

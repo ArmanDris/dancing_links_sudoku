@@ -1,7 +1,8 @@
+use rand::Rng;
 use std::array;
 
 use crate::{
-    Board,
+    Board, DecisionStrategy,
     algorithm_x::{ConstraintTable, generate_constraint_table},
 };
 
@@ -241,6 +242,127 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
     }
 }
 
+// TODO! SELECT THE COLUMN WITH THE LEAST AMOUNT OF CELLS, THIS REDUCES
+// BRANCHING FACTOR. SOURCE KNUTHS PAPER PAGE 6 RIGHT AFTER IMAGE
+fn select_column(
+    unsatisfied_columns: &mut Vec<usize>,
+    decision_strategy: DecisionStrategy,
+) -> usize {
+    match decision_strategy {
+        DecisionStrategy::First => {
+            return unsatisfied_columns
+                .pop()
+                .expect("There were no unsatisfied columns to select");
+        }
+        DecisionStrategy::Random => rand::thread_rng().gen_range(0..unsatisfied_columns.len()),
+    }
+}
+
+fn find_satisfying_row(selected_column_idx: usize, table: &LinkedTable) -> usize {
+    // Literally just go to the ColumnHeader and find down
+    match table.table[0][selected_column_idx] {
+        Link::EmptyLink => panic!("must be a column header"),
+        Link::Cell(_) => panic!("must be a column header"),
+        Link::ColumnHeader(ch) => {
+            if ch.down == None || ch.down == Some(0) {
+                panic!(
+                    "There are no rows that satisfy the constraint at column: {}",
+                    selected_column_idx
+                );
+            }
+
+            return ch.down.unwrap();
+        }
+    };
+}
+
+fn hide_column_header(column_idx: usize, table: &mut LinkedTable) {
+    let ch = match table.table[0][column_idx] {
+        Link::EmptyLink => panic!("cannot hide empty link"),
+        Link::Cell(_) => panic!("cannot hide cell"),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    match &mut table.table[0][ch.left.unwrap()] {
+        Link::ColumnHeader(c) => c.right = ch.right,
+        _ => panic!("invalid"),
+    };
+
+    match &mut table.table[0][ch.right.unwrap()] {
+        Link::ColumnHeader(c) => c.left = ch.left,
+        _ => panic!("invalid"),
+    };
+}
+
+/// Hides a Link::Cell by updating the cells above and below to point around
+/// the specified cell.
+fn hide_cell(row_idx: usize, column_idx: usize, table: &mut LinkedTable) {
+    let cell = match table.table[row_idx][column_idx] {
+        Link::EmptyLink => panic!("cannot hide empty link"),
+        Link::ColumnHeader(_) => panic!("cannot hide column header"),
+        Link::Cell(c) => c,
+    };
+
+    match &mut table.table[cell.up.unwrap()][column_idx] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(above_cell) => above_cell.down = cell.down,
+        Link::ColumnHeader(above_ch) => above_ch.down = cell.down,
+    }
+
+    match &mut table.table[cell.down.unwrap()][column_idx] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(below_cell) => below_cell.up = cell.up,
+        Link::ColumnHeader(below_ch) => below_ch.up = cell.up,
+    }
+
+    match &mut table.table[0][column_idx] {
+        Link::ColumnHeader(ch) => ch.cell_count -= 1,
+        _ => panic!("invalid"),
+    }
+}
+
+fn cover_column(selected_column_idx: usize, table: &mut LinkedTable) {
+    let ch = match table.table[0][selected_column_idx] {
+        Link::EmptyLink => panic!("should be column header"),
+        Link::Cell(_) => panic!("should be column header"),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    let mut next_row_idx = ch
+        .down
+        .expect("Column header should never have a none down");
+
+    // Traverse columns with adjacent cells and hide them
+    while next_row_idx != 0 {
+        // Need to hide all cells in row `next_row_idx`
+        let mut next_column_idx = match table.table[next_row_idx][selected_column_idx] {
+            Link::EmptyLink => panic!("Should never point to empty link"),
+            Link::ColumnHeader(ch) => ch.right.unwrap(),
+            Link::Cell(c) => c.right.unwrap(),
+        };
+
+        while next_column_idx != selected_column_idx {
+            // Hide this cell then update next column idx
+            hide_cell(next_row_idx, next_column_idx, table);
+
+            next_column_idx = match table.table[next_row_idx][next_column_idx] {
+                Link::EmptyLink => panic!("Should never point to empty link"),
+                Link::ColumnHeader(ch) => ch.right.unwrap(),
+                Link::Cell(c) => c.right.unwrap(),
+            };
+        }
+
+        next_row_idx = match table.table[next_row_idx][selected_column_idx] {
+            Link::EmptyLink => panic!("invalid"),
+            Link::ColumnHeader(ch) => ch.down.unwrap(),
+            Link::Cell(c) => c.down.unwrap(),
+        };
+    }
+
+    // Unlink the column header
+    hide_column_header(selected_column_idx, table);
+}
+
 fn generate_linked_table() -> LinkedTable {
     let mut table = LinkedTable::default();
     link_unlinked_table(&mut table);
@@ -248,6 +370,35 @@ fn generate_linked_table() -> LinkedTable {
 }
 
 pub fn launch_dancing_links() -> Vec<Board> {
-    let linked_table = generate_linked_table();
+    let mut linked_table = generate_linked_table();
+
+    let mut unsatisfied_columns: Vec<usize> = (0..LINKED_TABLE_COLUMNS).collect();
+    let mut solution_set: Vec<usize> = vec![];
+
+    loop {
+        let selected_column_idx = select_column(&mut unsatisfied_columns, DecisionStrategy::First);
+
+        let selected_row_idx = find_satisfying_row(selected_column_idx, &linked_table);
+        solution_set.push(selected_row_idx);
+
+        let mut current_column_idx = selected_column_idx;
+        loop {
+            cover_column(current_column_idx, &mut linked_table);
+
+            current_column_idx = match linked_table.table[selected_row_idx][current_column_idx] {
+                Link::Cell(c) => c.right.unwrap(),
+                _ => panic!("must be a cell"),
+            };
+
+            if current_column_idx == selected_column_idx {
+                break;
+            }
+        }
+
+        if true {
+            break;
+        }
+    }
+
     vec![]
 }
