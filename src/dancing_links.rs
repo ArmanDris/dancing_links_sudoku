@@ -2,7 +2,7 @@ use rand::Rng;
 use std::array;
 
 use crate::{
-    Board, DecisionStrategy,
+    Board,
     algorithm_x::{ConstraintTable, generate_constraint_table},
 };
 
@@ -41,6 +41,13 @@ const LINKED_TABLE_ROWS: usize = 730;
 
 struct LinkedTable {
     table: Box<[[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]>,
+}
+/// Strategy to select the next column in Dancing Links search
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DecisionStrategy {
+    First,
+    Random,
+    Optimal,
 }
 
 impl Default for LinkedTable {
@@ -242,19 +249,50 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
     }
 }
 
-// TODO! SELECT THE COLUMN WITH THE LEAST AMOUNT OF CELLS, THIS REDUCES
-// BRANCHING FACTOR. SOURCE KNUTHS PAPER PAGE 6 RIGHT AFTER IMAGE
+/// Selects a column from the list of potential columns according to the strategy.
+/// Returns (selected_column, remaining_columns)
 fn select_column(
-    unsatisfied_columns: &mut Vec<usize>,
+    mut potential_columns: Vec<usize>,
     decision_strategy: DecisionStrategy,
-) -> usize {
+    table: &LinkedTable,
+) -> (usize, Vec<usize>) {
+    if potential_columns.is_empty() {
+        panic!("No columns to select");
+    }
     match decision_strategy {
         DecisionStrategy::First => {
-            return unsatisfied_columns
-                .pop()
-                .expect("There were no unsatisfied columns to select");
+            let selected = potential_columns.pop().unwrap();
+            (selected, potential_columns)
         }
-        DecisionStrategy::Random => rand::thread_rng().gen_range(0..unsatisfied_columns.len()),
+        DecisionStrategy::Random => {
+            let idx = rand::thread_rng().gen_range(0..potential_columns.len());
+            let selected = potential_columns.remove(idx);
+            (selected, potential_columns)
+        }
+        DecisionStrategy::Optimal => {
+            let mut rng = rand::thread_rng();
+            let mut min_count = i32::MAX;
+            let mut min_positions = Vec::new();
+            for (i, &col) in potential_columns.iter().enumerate() {
+                if let Link::ColumnHeader(ch) = table.table[0][col] {
+                    let count = ch.cell_count;
+                    if count < min_count {
+                        min_count = count;
+                        min_positions.clear();
+                        min_positions.push(i);
+                    } else if count == min_count {
+                        min_positions.push(i);
+                    }
+                }
+            }
+            if min_positions.is_empty() {
+                panic!("No columns to select");
+            }
+            let pick = rng.gen_range(0..min_positions.len());
+            let pos = min_positions[pick];
+            let selected = potential_columns.remove(pos);
+            (selected, potential_columns)
+        }
     }
 }
 
@@ -376,7 +414,9 @@ pub fn launch_dancing_links() -> Vec<Board> {
     let mut solution_set: Vec<usize> = vec![];
 
     loop {
-        let selected_column_idx = select_column(&mut unsatisfied_columns, DecisionStrategy::First);
+        let (selected_column_idx, new_unsatisfied_columns) =
+            select_column(unsatisfied_columns, DecisionStrategy::First, &linked_table);
+        unsatisfied_columns = new_unsatisfied_columns;
 
         let selected_row_idx = find_satisfying_row(selected_column_idx, &linked_table);
         solution_set.push(selected_row_idx);
