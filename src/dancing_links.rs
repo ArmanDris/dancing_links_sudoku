@@ -58,11 +58,14 @@ impl Default for LinkedTable {
             vec_table.push([Link::EmptyLink; LINKED_TABLE_COLUMNS]);
         }
 
-        let typed_boxed_table: Box<[[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]> =
-            match vec_table.into_boxed_slice().try_into() {
-                Ok(result) => result,
-                Err(_err) => panic!("unable to initialize empty dancing link table"),
-            };
+        let typed_boxed_table: Box<
+            [[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS],
+        > = match vec_table.into_boxed_slice().try_into() {
+            Ok(result) => result,
+            Err(_err) => {
+                panic!("unable to initialize empty dancing link table")
+            }
+        };
 
         let constraint_table = generate_constraint_table();
         let mut linked_table = Self {
@@ -70,7 +73,8 @@ impl Default for LinkedTable {
         };
 
         linked_table.table[0] = generate_column_headers(&constraint_table);
-        linked_table.table[1..].clone_from_slice(&*generate_unlinked_rows(&constraint_table));
+        linked_table.table[1..]
+            .clone_from_slice(&*generate_unlinked_rows(&constraint_table));
 
         linked_table
     }
@@ -102,7 +106,9 @@ fn generate_column_headers(constraint_table: &ConstraintTable) -> [Link; 324] {
     })
 }
 
-fn generate_unlinked_rows(constraint_table: &ConstraintTable) -> Box<[[Link; 324]; 729]> {
+fn generate_unlinked_rows(
+    constraint_table: &ConstraintTable,
+) -> Box<[[Link; 324]; 729]> {
     let mut linked_rows: Vec<[Link; 324]> = vec![];
 
     for (row_idx, row) in constraint_table.table.iter().enumerate() {
@@ -165,7 +171,9 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
 
             match &mut table[row_index][last_link_index.unwrap()] {
                 Link::EmptyLink => (),
-                Link::ColumnHeader(column_header) => column_header.right = Some(column_index),
+                Link::ColumnHeader(column_header) => {
+                    column_header.right = Some(column_index)
+                }
                 Link::Cell(cell) => cell.right = Some(column_index),
             }
 
@@ -182,13 +190,17 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
 
         match &mut table[row_index][first_link_index] {
             Link::EmptyLink => (),
-            Link::ColumnHeader(column_header) => column_header.left = Some(last_link_index),
+            Link::ColumnHeader(column_header) => {
+                column_header.left = Some(last_link_index)
+            }
             Link::Cell(cell) => cell.left = Some(last_link_index),
         };
 
         match &mut table[row_index][last_link_index] {
             Link::EmptyLink => (),
-            Link::ColumnHeader(column_header) => column_header.right = Some(first_link_index),
+            Link::ColumnHeader(column_header) => {
+                column_header.right = Some(first_link_index)
+            }
             Link::Cell(cell) => cell.right = Some(first_link_index),
         };
     }
@@ -214,13 +226,17 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
 
             match &mut table[row_index][column_index] {
                 Link::EmptyLink => (),
-                Link::ColumnHeader(column_header) => column_header.up = last_link_index,
+                Link::ColumnHeader(column_header) => {
+                    column_header.up = last_link_index
+                }
                 Link::Cell(cell) => cell.up = last_link_index,
             };
 
             match &mut table[last_link_index.unwrap()][column_index] {
                 Link::EmptyLink => (),
-                Link::ColumnHeader(column_header) => column_header.down = Some(row_index),
+                Link::ColumnHeader(column_header) => {
+                    column_header.down = Some(row_index)
+                }
                 Link::Cell(cell) => cell.down = Some(row_index),
             };
 
@@ -237,13 +253,17 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
 
         match &mut table[first_link_index][column_index] {
             Link::EmptyLink => (),
-            Link::ColumnHeader(column_header) => column_header.up = Some(last_link_index),
+            Link::ColumnHeader(column_header) => {
+                column_header.up = Some(last_link_index)
+            }
             Link::Cell(cell) => cell.up = Some(last_link_index),
         };
 
         match &mut table[last_link_index][column_index] {
             Link::EmptyLink => (),
-            Link::ColumnHeader(column_header) => column_header.down = Some(first_link_index),
+            Link::ColumnHeader(column_header) => {
+                column_header.down = Some(first_link_index)
+            }
             Link::Cell(cell) => cell.down = Some(first_link_index),
         };
     }
@@ -289,7 +309,10 @@ fn select_column(
 
 // TODO: Implement decision strategies for this as well. The program will work
 // fine without this so it is very low priority.
-fn find_satisfying_rows(selected_column_idx: usize, table: &LinkedTable) -> (usize, Vec<usize>) {
+fn find_satisfying_rows(
+    selected_column_idx: usize,
+    table: &LinkedTable,
+) -> (usize, Vec<usize>) {
     // Literally just go to the ColumnHeader and find down
     let selected_row = match table.table[0][selected_column_idx] {
         Link::ColumnHeader(ch) => ch.down.unwrap(),
@@ -375,11 +398,12 @@ fn cover_column(selected_column_idx: usize, table: &mut LinkedTable) {
     // Traverse columns with adjacent cells and hide them
     while next_row_idx != 0 {
         // Need to hide all cells in row `next_row_idx`
-        let mut next_column_idx = match table.table[next_row_idx][selected_column_idx] {
-            Link::EmptyLink => panic!("Should never point to empty link"),
-            Link::ColumnHeader(ch) => ch.right.unwrap(),
-            Link::Cell(c) => c.right.unwrap(),
-        };
+        let mut next_column_idx =
+            match table.table[next_row_idx][selected_column_idx] {
+                Link::EmptyLink => panic!("Should never point to empty link"),
+                Link::ColumnHeader(ch) => ch.right.unwrap(),
+                Link::Cell(c) => c.right.unwrap(),
+            };
 
         while next_column_idx != selected_column_idx {
             // Hide this cell then update next column idx
@@ -409,10 +433,19 @@ fn generate_linked_table() -> LinkedTable {
     table
 }
 
+fn hide_all_columns_in_row(
+    row_idx: usize,
+    column_idx: usize,
+    table: &mut LinkedTable,
+) {
+    todo!()
+}
+
 pub fn launch_dancing_links() -> Vec<Board> {
     let mut linked_table = generate_linked_table();
 
-    let mut unsatisfied_columns: Vec<usize> = (0..LINKED_TABLE_COLUMNS).collect();
+    let mut unsatisfied_columns: Vec<usize> =
+        (0..LINKED_TABLE_COLUMNS).collect();
     let mut solution_set: Vec<usize> = vec![];
     // Tuples where the first entry is the selected row, and the second is the
     // alternate rows.
@@ -425,7 +458,8 @@ pub fn launch_dancing_links() -> Vec<Board> {
             &linked_table,
         );
 
-        let (selected_row, _alternate_rows) = find_satisfying_rows(selected_column, &linked_table);
+        let (selected_row, _alternate_rows) =
+            find_satisfying_rows(selected_column, &linked_table);
         solution_set.push(selected_row);
 
         cover_column(selected_column, &mut linked_table);
