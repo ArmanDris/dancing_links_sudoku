@@ -54,54 +54,38 @@ fn it_can_construct_an_empty_table() {
 #[test]
 fn it_selects_first_column_simple() {
     let lt = LinkedTable::default();
-    let cols = vec![4, 5, 6];
-    let (selected, remaining) = select_column(cols, DecisionStrategy::First, &lt);
+    let mut cols = vec![4, 5, 6];
+    let selected = select_column(&mut cols, DecisionStrategy::First, &lt);
     assert_eq!(selected, 6);
-    assert_eq!(remaining, vec![4, 5]);
+    assert_eq!(cols, vec![4, 5]);
 }
 
 #[test]
 fn it_selects_random_column_simple() {
     let lt = LinkedTable::default();
-    let cols = vec![10, 20, 30];
+    let mut cols = vec![10, 20, 30];
     let before = cols.clone();
-    let (selected, remaining) = select_column(cols, DecisionStrategy::Random, &lt);
+    let selected = select_column(&mut cols, DecisionStrategy::Random, &lt);
+    assert_eq!(cols.len(), before.len() - 1);
     assert!(before.contains(&selected));
-    // Remaining should have one fewer element, without the selected
-    assert_eq!(remaining.len(), before.len() - 1);
-    assert!(!remaining.contains(&selected));
-    for &col in &remaining {
-        assert!(before.contains(&col));
+    assert!(!cols.contains(&selected));
+}
+
+#[test]
+fn it_selects_optimal_column() {
+    let mut linked_table = LinkedTable::default();
+    link_unlinked_table(&mut linked_table);
+
+    if let Link::ColumnHeader(ch) = &mut linked_table.table[0][5] {
+        ch.cell_count = 8;
     }
-}
-
-#[test]
-fn it_selects_optimal_column_unique() {
-    // Unique minimum cell_count should be selected
-    let mut linked_table = LinkedTable::default();
-    // Override cell_count for test columns
-    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader { cell_count: 1, up: None, down: None, left: None, right: None });
-    linked_table.table[0][1] = Link::ColumnHeader(ColumnHeader { cell_count: 3, up: None, down: None, left: None, right: None });
-    linked_table.table[0][2] = Link::ColumnHeader(ColumnHeader { cell_count: 5, up: None, down: None, left: None, right: None });
-    let cols = vec![0, 1, 2];
-    let (selected, remaining) = select_column(cols, DecisionStrategy::Optimal, &linked_table);
-    assert_eq!(selected, 0);
-    assert_eq!(remaining, vec![1, 2]);
-}
-
-#[test]
-fn it_selects_optimal_column_tie() {
-    // In a tie among minimum, should select one randomly from the minimums
-    let mut linked_table = LinkedTable::default();
-    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader { cell_count: 2, up: None, down: None, left: None, right: None });
-    linked_table.table[0][1] = Link::ColumnHeader(ColumnHeader { cell_count: 1, up: None, down: None, left: None, right: None });
-    linked_table.table[0][2] = Link::ColumnHeader(ColumnHeader { cell_count: 1, up: None, down: None, left: None, right: None });
-    let cols = vec![0, 1, 2];
-    let (selected, remaining) = select_column(cols, DecisionStrategy::Optimal, &linked_table);
-    assert!(selected == 1 || selected == 2);
-    assert_eq!(remaining.len(), 2);
-    assert!(remaining.contains(&0));
-    assert!(!remaining.contains(&selected));
+    if let Link::ColumnHeader(ch) = &mut linked_table.table[0][8] {
+        ch.cell_count = 8;
+    }
+    let mut cols = vec![0, 5, 6, 8];
+    let selected = select_column(&mut cols, DecisionStrategy::Optimal, &linked_table);
+    assert!(selected == 5 || selected == 8);
+    assert!(cols == vec![0, 6, 8] || cols == vec![0, 5, 6]);
 }
 
 #[test]

@@ -249,49 +249,40 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
     }
 }
 
-/// Selects a column from the list of potential columns according to the strategy.
-/// Returns (selected_column, remaining_columns)
+/// Selects a column from the list of potential columns according to the
+/// strategy. Removes the column from the vector and returns it.
 fn select_column(
-    mut potential_columns: Vec<usize>,
+    potential_columns: &mut Vec<usize>,
     decision_strategy: DecisionStrategy,
     table: &LinkedTable,
-) -> (usize, Vec<usize>) {
+) -> usize {
     if potential_columns.is_empty() {
         panic!("No columns to select");
     }
     match decision_strategy {
-        DecisionStrategy::First => {
-            let selected = potential_columns.pop().unwrap();
-            (selected, potential_columns)
-        }
+        DecisionStrategy::First => potential_columns.pop().unwrap(),
         DecisionStrategy::Random => {
             let idx = rand::thread_rng().gen_range(0..potential_columns.len());
-            let selected = potential_columns.remove(idx);
-            (selected, potential_columns)
+            potential_columns.remove(idx)
         }
         DecisionStrategy::Optimal => {
-            let mut rng = rand::thread_rng();
             let mut min_count = i32::MAX;
-            let mut min_positions = Vec::new();
-            for (i, &col) in potential_columns.iter().enumerate() {
+            let mut min_column_idxs = Vec::new();
+            for (idx, &col) in potential_columns.iter().enumerate() {
                 if let Link::ColumnHeader(ch) = table.table[0][col] {
                     let count = ch.cell_count;
                     if count < min_count {
                         min_count = count;
-                        min_positions.clear();
-                        min_positions.push(i);
+                        min_column_idxs.clear();
+                        min_column_idxs.push(idx);
                     } else if count == min_count {
-                        min_positions.push(i);
+                        min_column_idxs.push(idx);
                     }
                 }
             }
-            if min_positions.is_empty() {
-                panic!("No columns to select");
-            }
-            let pick = rng.gen_range(0..min_positions.len());
-            let pos = min_positions[pick];
-            let selected = potential_columns.remove(pos);
-            (selected, potential_columns)
+            let idx = rand::thread_rng().gen_range(0..min_column_idxs.len());
+            let random_potential_columns_idx = min_column_idxs[idx];
+            potential_columns.remove(random_potential_columns_idx)
         }
     }
 }
@@ -412,25 +403,30 @@ pub fn launch_dancing_links() -> Vec<Board> {
 
     let mut unsatisfied_columns: Vec<usize> = (0..LINKED_TABLE_COLUMNS).collect();
     let mut solution_set: Vec<usize> = vec![];
+    // Tuples where the first entry is the selected row, and the second is the
+    // alternate rows.
+    let mut decisions: Vec<(usize, Vec<usize>)> = vec![];
 
     loop {
-        let (selected_column_idx, new_unsatisfied_columns) =
-            select_column(unsatisfied_columns, DecisionStrategy::First, &linked_table);
-        unsatisfied_columns = new_unsatisfied_columns;
+        let selected_column = select_column(
+            &mut unsatisfied_columns,
+            DecisionStrategy::First,
+            &linked_table,
+        );
 
-        let selected_row_idx = find_satisfying_row(selected_column_idx, &linked_table);
+        let selected_row_idx = find_satisfying_row(selected_column, &linked_table);
         solution_set.push(selected_row_idx);
 
-        let mut current_column_idx = selected_column_idx;
+        let mut current_column = selected_column;
         loop {
-            cover_column(current_column_idx, &mut linked_table);
+            cover_column(current_column, &mut linked_table);
 
-            current_column_idx = match linked_table.table[selected_row_idx][current_column_idx] {
+            current_column = match linked_table.table[selected_row_idx][current_column] {
                 Link::Cell(c) => c.right.unwrap(),
                 _ => panic!("must be a cell"),
             };
 
-            if current_column_idx == selected_column_idx {
+            if current_column == selected_column {
                 break;
             }
         }
