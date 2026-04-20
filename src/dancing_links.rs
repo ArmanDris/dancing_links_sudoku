@@ -428,19 +428,7 @@ pub fn launch_dancing_links() -> Vec<Board> {
         let (selected_row, _alternate_rows) = find_satisfying_rows(selected_column, &linked_table);
         solution_set.push(selected_row);
 
-        let mut current_column = selected_column;
-        loop {
-            cover_column(current_column, &mut linked_table);
-
-            current_column = match linked_table.table[selected_row][current_column] {
-                Link::Cell(c) => c.right.unwrap(),
-                _ => panic!("must be a cell"),
-            };
-
-            if current_column == selected_column {
-                break;
-            }
-        }
+        cover_column(selected_column, &mut linked_table);
 
         if true {
             break;
