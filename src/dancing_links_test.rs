@@ -633,3 +633,14 @@ fn it_covers_a_column() {
         })
     );
 }
+
+#[test]
+fn it_finds_all_expected_rows() {
+    let mut linked_table = LinkedTable::default();
+    link_unlinked_table(&mut linked_table);
+
+    let (selected_row, alternate_rows) = find_satisfying_rows(14, &mut linked_table);
+
+    assert_eq!(selected_row, 87);
+    assert_eq!(alternate_rows, vec![96, 105, 114, 123, 132, 141, 150, 159]);
+}

@@ -287,22 +287,33 @@ fn select_column(
     }
 }
 
-fn find_satisfying_row(selected_column_idx: usize, table: &LinkedTable) -> usize {
+// TODO: Implement decision strategies for this as well. The program will work
+// fine without this so it is very low priority.
+fn find_satisfying_rows(selected_column_idx: usize, table: &LinkedTable) -> (usize, Vec<usize>) {
     // Literally just go to the ColumnHeader and find down
-    match table.table[0][selected_column_idx] {
-        Link::EmptyLink => panic!("must be a column header"),
-        Link::Cell(_) => panic!("must be a column header"),
-        Link::ColumnHeader(ch) => {
-            if ch.down == None || ch.down == Some(0) {
-                panic!(
-                    "There are no rows that satisfy the constraint at column: {}",
-                    selected_column_idx
-                );
-            }
-
-            return ch.down.unwrap();
-        }
+    let selected_row = match table.table[0][selected_column_idx] {
+        Link::ColumnHeader(ch) => ch.down.unwrap(),
+        _ => panic!(),
     };
+
+    let mut alternate_rows: Vec<usize> = vec![];
+
+    let mut next_row = Some(selected_row);
+
+    loop {
+        next_row = match table.table[next_row.unwrap()][selected_column_idx] {
+            Link::Cell(c) => c.down,
+            _ => panic!(),
+        };
+
+        if next_row == Some(0) {
+            break;
+        }
+
+        alternate_rows.push(next_row.unwrap());
+    }
+
+    (selected_row, alternate_rows)
 }
 
 fn hide_column_header(column_idx: usize, table: &mut LinkedTable) {
@@ -405,7 +416,7 @@ pub fn launch_dancing_links() -> Vec<Board> {
     let mut solution_set: Vec<usize> = vec![];
     // Tuples where the first entry is the selected row, and the second is the
     // alternate rows.
-    let mut decisions: Vec<(usize, Vec<usize>)> = vec![];
+    let mut _decisions: Vec<(usize, Vec<usize>)> = vec![];
 
     loop {
         let selected_column = select_column(
@@ -414,14 +425,14 @@ pub fn launch_dancing_links() -> Vec<Board> {
             &linked_table,
         );
 
-        let selected_row_idx = find_satisfying_row(selected_column, &linked_table);
-        solution_set.push(selected_row_idx);
+        let (selected_row, _alternate_rows) = find_satisfying_rows(selected_column, &linked_table);
+        solution_set.push(selected_row);
 
         let mut current_column = selected_column;
         loop {
             cover_column(current_column, &mut linked_table);
 
-            current_column = match linked_table.table[selected_row_idx][current_column] {
+            current_column = match linked_table.table[selected_row][current_column] {
                 Link::Cell(c) => c.right.unwrap(),
                 _ => panic!("must be a cell"),
             };
