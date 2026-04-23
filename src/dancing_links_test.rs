@@ -83,7 +83,8 @@ fn it_selects_optimal_column() {
         ch.cell_count = 8;
     }
     let mut cols = vec![0, 5, 6, 8];
-    let selected = select_column(&mut cols, DecisionStrategy::Optimal, &linked_table);
+    let selected =
+        select_column(&mut cols, DecisionStrategy::Optimal, &linked_table);
     assert!(selected == 5 || selected == 8);
     assert!(cols == vec![0, 6, 8] || cols == vec![0, 5, 6]);
 }
@@ -110,7 +111,8 @@ fn it_generates_unlinked_rows() {
     let constraint_table = generate_constraint_table();
     let rows = generate_unlinked_rows(&constraint_table);
 
-    let num_cells_first_row = rows[0].iter().filter(|x| **x != Link::EmptyLink).count();
+    let num_cells_first_row =
+        rows[0].iter().filter(|x| **x != Link::EmptyLink).count();
 
     assert_eq!(num_cells_first_row, 4);
 
@@ -172,13 +174,15 @@ fn it_links_the_rows_in_an_uninitialized_table() {
     assert_eq!(first_index_right, Some(1));
     assert_eq!(first_index_left, Some(LINKED_TABLE_COLUMNS - 1));
 
-    let last_index_right = match &linked_table.table[0][LINKED_TABLE_COLUMNS - 1] {
-        Link::EmptyLink => None,
-        Link::Cell(_) => None,
-        Link::ColumnHeader(ch) => ch.right,
-    };
+    let last_index_right =
+        match &linked_table.table[0][LINKED_TABLE_COLUMNS - 1] {
+            Link::EmptyLink => None,
+            Link::Cell(_) => None,
+            Link::ColumnHeader(ch) => ch.right,
+        };
 
-    let last_index_left = match &linked_table.table[0][LINKED_TABLE_COLUMNS - 1] {
+    let last_index_left = match &linked_table.table[0][LINKED_TABLE_COLUMNS - 1]
+    {
         Link::EmptyLink => None,
         Link::Cell(_) => None,
         Link::ColumnHeader(ch) => ch.left,
@@ -221,7 +225,8 @@ fn it_links_the_columns_in_an_uninitlized_table() {
                 Link::EmptyLink => (),
                 Link::ColumnHeader(_) => (),
                 Link::Cell(_) => {
-                    first_cell = Some(&linked_table.table[row_index][column_index]);
+                    first_cell =
+                        Some(&linked_table.table[row_index][column_index]);
                     break;
                 }
             };
@@ -502,7 +507,6 @@ fn it_covers_a_column() {
         down: Some(0),
     });
 
-    // TODO! Make the initial assetions then act and make the updated
     // assertions
     assert_eq!(
         linked_table.table[0][0],
@@ -639,8 +643,533 @@ fn it_finds_all_expected_rows() {
     let mut linked_table = LinkedTable::default();
     link_unlinked_table(&mut linked_table);
 
-    let (selected_row, alternate_rows) = find_satisfying_rows(14, &mut linked_table);
+    let (selected_row, alternate_rows) =
+        find_satisfying_rows(14, &mut linked_table);
 
     assert_eq!(selected_row, 87);
     assert_eq!(alternate_rows, vec![96, 105, 114, 123, 132, 141, 150, 159]);
+}
+
+#[test]
+fn it_coveres_all_columns_for_a_row() {
+    // Starting with this grid:
+    //
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | v      | v      | V      | V      | V      | v      | v
+    // --->  A  --->  B  --->  C  --->  D  --->  E  --->  F  --->  G  ---
+    // ---- (2) <--- (2) <--- (2) <--- (3) <--- (2) <--- (2) <--- (3) <--
+    //      ^ |      ^ |      ^ |      ^ |      ^ |      ^ |      ^ |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | |      | |      | V      | |      | V      | v      | |
+    //      | |      | |     [   ]     | |     [   ]    [   ]     | |
+    //      | |      | |     [   ]     | |     [   ]    [   ]     | |
+    //      | |      | |      ^ |      | |      ^ |      ^ |      | |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | v      | |      | |      | V      | |      | |      | v
+    //     [   ]     | |      | |     [   ]     | |      | |     [   ]
+    //     [   ]     | |      | |     [   ]     | |      | |     [   ]
+    //      ^ |      | |      | |      ^ |      | |      | |      ^ |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | |      | v      | V      | |      | |      | V      | |
+    //      | |     [   ]    [   ]     | |      | |     [   ]     | |
+    //      | |     [   ]    [   ]     | |      | |     [   ]     | |
+    //      | |      ^ |      ^ |      | |      | |      ^ |      | |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | v      | |      | |      | V      | |      | |      | |
+    //     [   ]     | |      | |     [   ]     | |      | |      | |
+    //     [   ]     | |      | |     [   ]     | |      | |      | |
+    //      ^ |      | |      | |      ^ |      | |      | |      | |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | |      | v      | |      | |      | |      | |      | v
+    //      | |     [   ]     | |      | |      | |      | |     [   ]
+    //      | |     [   ]     | |      | |      | |      | |     [   ]
+    //      | |      ^ |      | |      | |      | |      | |      ^ |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | |      | |      | |      | V      | v      | |      | v
+    //      | |      | |      | |     [   ]    [   ]     | |     [   ]
+    //      | |      | |      | |     [   ]    [   ]     | |     [   ]
+    //      | |      | |      | |      ^ |      ^ |      | |      ^ |
+    //      | |      | |      | |      | |      | |      | |      | |
+    //
+    // If we cover column A, then D, then G then we should have:
+    //      | |      | |      | |      | |      | |      | |      | |
+    //     -|-v-     | v      | V     -|-V-     | V      | v     -|-v-
+    // ---/  A -\-->  B  --->  C  ---/  D -\-->  E  --->  F  ---/  G -\--
+    // ---\-(1) /--- (1) <--- (2) <--\-(1) /--- (1) <--- (2) <--\-(1) /--
+    //     -^-|-     ^ |      ^ |     \^-|-     ^ |      ^ |     -^-|-
+    //      | |      | |      | |      | |      | |      | |      | |
+    //      | |      | |      | V      | |      | V      | v      | |
+    //      | |      | |     [   ]     | |     [   ]    [   ]     | |
+    //      | |      | |     [   ]     | |     [   ]    [   ]     | |
+    //      | |      | |      ^ |      | |      ^ |      ^ |      | |
+    //      | |      | |      | |     /| \      | |      | |     /| \
+    //      | v      | |      | |    / |   \    | |      | |    / |   \
+    //     [   ]     | |      | |   | [   ] |   | |      | |   | [   ] |
+    //     [   ]     | |      | |   | [   ] |   | |      | |   | [   ] |
+    //      ^ |      | |      | |    \   | /    | |      | |    \   | /
+    //      | |      | |      | |      \ |/     | |      | |      \ |/
+    //      | |      | v      | V      | |      | |      | V      | |
+    //      | |     [   ]    [   ]     | |      | |     [   ]     | |
+    //      | |     [   ]    [   ]     | |      | |     [   ]     | |
+    //      | |      ^ |      ^ |      | |      | |      ^ |      | |
+    //     /|  \     | |      | |      | |      | |      | |      | |
+    //    / |   \    | |      | |      | V      | |      | |      | |
+    //   | [   ] |   | |      | |     [   ]     | |      | |      | |
+    //   | [   ] |   | |      | |     [   ]     | |      | |      | |
+    //    \   | /    | |      | |      ^ |      | |      | |      | |
+    //     \  |/    /|  \     | |      | |      | |      | |      | |
+    //      | |    / |   \    | |      | |      | |      | |      | v
+    //      | |   | [   ] |   | |      | |      | |      | |     [   ]
+    //      | |   | [   ] |   | |      | |      | |      | |     [   ]
+    //      | |    \   | /    | |      | |      | |      | |      ^ |
+    //      | |     \  |/     | |      | |     /|  \     | |     /|  \
+    //      | |      | |      | |      | V    / |   \    | |    / |   \
+    //      | |      | |      | |     [   ]  | [   ] |   | |   | [   ] |
+    //      | |      | |      | |     [   ]  | [   ] |   | |   | [   ] |
+    //      | |      | |      | |      ^ |    \   | /    | |    \   | /
+    //      | |      | |      | |      | |     \  |/     | |     \  |/
+
+    // Arrage - Setup the linked table
+    let mut linked_table = LinkedTable::default();
+    // Column headers
+    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(4),
+        down: Some(2),
+        left: Some(6),
+        right: Some(1),
+    });
+    linked_table.table[0][1] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(5),
+        down: Some(3),
+        left: Some(0),
+        right: Some(2),
+    });
+    linked_table.table[0][2] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(3),
+        down: Some(1),
+        left: Some(1),
+        right: Some(3),
+    });
+    linked_table.table[0][3] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 3,
+        up: Some(6),
+        down: Some(2),
+        left: Some(2),
+        right: Some(4),
+    });
+    linked_table.table[0][4] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(6),
+        down: Some(1),
+        left: Some(3),
+        right: Some(5),
+    });
+    linked_table.table[0][5] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(3),
+        down: Some(1),
+        left: Some(4),
+        right: Some(6),
+    });
+    linked_table.table[0][6] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 3,
+        up: Some(6),
+        down: Some(2),
+        left: Some(5),
+        right: Some(0),
+    });
+    // Row 1
+    linked_table.table[1][2] = Link::Cell(Cell {
+        column_index: 2,
+        row_index: 1,
+        up: Some(0),
+        down: Some(3),
+        left: Some(5),
+        right: Some(4),
+    });
+    linked_table.table[1][4] = Link::Cell(Cell {
+        column_index: 4,
+        row_index: 1,
+        up: Some(0),
+        down: Some(6),
+        left: Some(2),
+        right: Some(5),
+    });
+    linked_table.table[1][5] = Link::Cell(Cell {
+        column_index: 5,
+        row_index: 1,
+        up: Some(0),
+        down: Some(3),
+        left: Some(4),
+        right: Some(2),
+    });
+    // Row 2
+    linked_table.table[2][0] = Link::Cell(Cell {
+        column_index: 0,
+        row_index: 2,
+        up: Some(0),
+        down: Some(4),
+        left: Some(6),
+        right: Some(3),
+    });
+    linked_table.table[2][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 2,
+        up: Some(0),
+        down: Some(4),
+        left: Some(0),
+        right: Some(6),
+    });
+    linked_table.table[2][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 2,
+        up: Some(0),
+        down: Some(5),
+        left: Some(3),
+        right: Some(0),
+    });
+    // Row 3
+    linked_table.table[3][1] = Link::Cell(Cell {
+        column_index: 1,
+        row_index: 3,
+        up: Some(0),
+        down: Some(5),
+        left: Some(5),
+        right: Some(2),
+    });
+    linked_table.table[3][2] = Link::Cell(Cell {
+        column_index: 2,
+        row_index: 3,
+        up: Some(1),
+        down: Some(0),
+        left: Some(1),
+        right: Some(5),
+    });
+    linked_table.table[3][5] = Link::Cell(Cell {
+        column_index: 5,
+        row_index: 3,
+        up: Some(1),
+        down: Some(0),
+        left: Some(2),
+        right: Some(1),
+    });
+    // Row 4
+    linked_table.table[4][0] = Link::Cell(Cell {
+        column_index: 0,
+        row_index: 4,
+        up: Some(2),
+        down: Some(0),
+        left: Some(3),
+        right: Some(3),
+    });
+    linked_table.table[4][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 4,
+        up: Some(2),
+        down: Some(6),
+        left: Some(0),
+        right: Some(0),
+    });
+    // Row 5
+    linked_table.table[5][1] = Link::Cell(Cell {
+        column_index: 1,
+        row_index: 5,
+        up: Some(3),
+        down: Some(0),
+        left: Some(6),
+        right: Some(6),
+    });
+    linked_table.table[5][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 5,
+        up: Some(1),
+        down: Some(6),
+        left: Some(1),
+        right: Some(1),
+    });
+    // Row 6
+    linked_table.table[6][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 6,
+        up: Some(4),
+        down: Some(0),
+        left: Some(6),
+        right: Some(4),
+    });
+    linked_table.table[6][4] = Link::Cell(Cell {
+        column_index: 4,
+        row_index: 6,
+        up: Some(1),
+        down: Some(0),
+        left: Some(3),
+        right: Some(6),
+    });
+    linked_table.table[6][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 6,
+        up: Some(5),
+        down: Some(0),
+        left: Some(4),
+        right: Some(3),
+    });
+
+    // Act - Hide column A (0), then D (3), then G (6)
+    hide_all_columns_in_row(2, 0, &mut linked_table);
+
+    // Assert - The columns were each hidden in the correct order
+    assert_eq!(
+        linked_table.table[0][0],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(4),
+            down: Some(2),
+            left: Some(6),
+            right: Some(1)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][1],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(3),
+            down: Some(3),
+            left: Some(5),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][2],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(3),
+            down: Some(1),
+            left: Some(1),
+            right: Some(4)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][3],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(6),
+            down: Some(6),
+            left: Some(2),
+            right: Some(4)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][4],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(1),
+            down: Some(1),
+            left: Some(2),
+            right: Some(5)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][5],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 2,
+            up: Some(3),
+            down: Some(1),
+            left: Some(4),
+            right: Some(1)
+        })
+    );
+    assert_eq!(
+        linked_table.table[0][6],
+        Link::ColumnHeader(ColumnHeader {
+            cell_count: 1,
+            up: Some(5),
+            down: Some(5),
+            left: Some(5),
+            right: Some(1)
+        })
+    );
+    // Row 1
+    assert_eq!(
+        linked_table.table[1][2],
+        Link::Cell(Cell {
+            column_index: 2,
+            row_index: 1,
+            up: Some(0),
+            down: Some(3),
+            left: Some(5),
+            right: Some(4)
+        })
+    );
+    assert_eq!(
+        linked_table.table[1][4],
+        Link::Cell(Cell {
+            column_index: 4,
+            row_index: 1,
+            up: Some(0),
+            down: Some(0),
+            left: Some(2),
+            right: Some(5)
+        })
+    );
+    assert_eq!(
+        linked_table.table[1][5],
+        Link::Cell(Cell {
+            column_index: 5,
+            row_index: 1,
+            up: Some(0),
+            down: Some(3),
+            left: Some(4),
+            right: Some(2)
+        })
+    );
+    // Row 2
+    assert_eq!(
+        linked_table.table[2][0],
+        Link::Cell(Cell {
+            column_index: 0,
+            row_index: 2,
+            up: Some(0),
+            down: Some(4),
+            left: Some(6),
+            right: Some(3)
+        })
+    );
+    assert_eq!(
+        linked_table.table[2][3],
+        Link::Cell(Cell {
+            column_index: 3,
+            row_index: 2,
+            up: Some(0),
+            down: Some(4),
+            left: Some(0),
+            right: Some(6)
+        })
+    );
+    assert_eq!(
+        linked_table.table[2][6],
+        Link::Cell(Cell {
+            column_index: 6,
+            row_index: 2,
+            up: Some(0),
+            down: Some(5),
+            left: Some(3),
+            right: Some(0)
+        })
+    );
+    // Row 3
+    assert_eq!(
+        linked_table.table[3][1],
+        Link::Cell(Cell {
+            column_index: 1,
+            row_index: 3,
+            up: Some(0),
+            down: Some(0),
+            left: Some(5),
+            right: Some(2)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][2],
+        Link::Cell(Cell {
+            column_index: 2,
+            row_index: 3,
+            up: Some(1),
+            down: Some(0),
+            left: Some(1),
+            right: Some(5)
+        })
+    );
+    assert_eq!(
+        linked_table.table[3][5],
+        Link::Cell(Cell {
+            column_index: 5,
+            row_index: 3,
+            up: Some(1),
+            down: Some(0),
+            left: Some(2),
+            right: Some(1)
+        })
+    );
+    // Row 4
+    assert_eq!(
+        linked_table.table[4][0],
+        Link::Cell(Cell {
+            column_index: 0,
+            row_index: 4,
+            up: Some(2),
+            down: Some(0),
+            left: Some(3),
+            right: Some(3)
+        })
+    );
+    assert_eq!(
+        linked_table.table[4][3],
+        Link::Cell(Cell {
+            column_index: 3,
+            row_index: 4,
+            up: Some(0),
+            down: Some(6),
+            left: Some(0),
+            right: Some(0),
+        })
+    );
+    // Row 5
+    assert_eq!(
+        linked_table.table[5][1],
+        Link::Cell(Cell {
+            column_index: 1,
+            row_index: 5,
+            up: Some(3),
+            down: Some(0),
+            left: Some(6),
+            right: Some(6)
+        })
+    );
+    assert_eq!(
+        linked_table.table[5][6],
+        Link::Cell(Cell {
+            column_index: 6,
+            row_index: 5,
+            up: Some(0),
+            down: Some(0),
+            left: Some(1),
+            right: Some(1)
+        })
+    );
+    // Row 6
+    assert_eq!(
+        linked_table.table[6][3],
+        Link::Cell(Cell {
+            column_index: 3,
+            row_index: 6,
+            up: Some(0),
+            down: Some(0),
+            left: Some(6),
+            right: Some(4)
+        })
+    );
+    assert_eq!(
+        linked_table.table[6][4],
+        Link::Cell(Cell {
+            column_index: 4,
+            row_index: 6,
+            up: Some(1),
+            down: Some(0),
+            left: Some(3),
+            right: Some(6)
+        })
+    );
+    assert_eq!(
+        linked_table.table[6][6],
+        Link::Cell(Cell {
+            column_index: 6,
+            row_index: 6,
+            up: Some(5),
+            down: Some(0),
+            left: Some(4),
+            right: Some(3)
+        })
+    );
 }
