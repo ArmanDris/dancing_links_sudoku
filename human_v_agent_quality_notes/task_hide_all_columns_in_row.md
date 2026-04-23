@@ -137,3 +137,9 @@ looking table:
     //                                              ^   v
 
 ```
+
+### Verdict:
+- Impressively integrated with my specific functions for manipulating a dancing 
+link table
+- Usual snags with readability blips, struggled with representing tests in an
+ASCII table
