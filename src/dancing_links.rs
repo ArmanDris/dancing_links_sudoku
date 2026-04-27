@@ -357,6 +357,24 @@ fn hide_column_header(column_idx: usize, table: &mut LinkedTable) {
     };
 }
 
+fn reveal_column_header(column_idx: usize, table: &mut LinkedTable) {
+    let ch = match table.table[0][column_idx] {
+        Link::EmptyLink => panic!("cannot reveal empty link"),
+        Link::Cell(_) => panic!("cannot reveal cell"),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    match &mut table.table[0][ch.left.unwrap()] {
+        Link::ColumnHeader(c) => c.right = Some(column_idx),
+        _ => panic!("invalid"),
+    };
+
+    match &mut table.table[0][ch.right.unwrap()] {
+        Link::ColumnHeader(c) => c.left = Some(column_idx),
+        _ => panic!("invalid"),
+    };
+}
+
 /// Hides a Link::Cell by updating the cells above and below to point around
 /// the specified cell.
 fn hide_cell(row_idx: usize, column_idx: usize, table: &mut LinkedTable) {
@@ -380,6 +398,31 @@ fn hide_cell(row_idx: usize, column_idx: usize, table: &mut LinkedTable) {
 
     match &mut table.table[0][column_idx] {
         Link::ColumnHeader(ch) => ch.cell_count -= 1,
+        _ => panic!("invalid"),
+    }
+}
+
+fn reveal_cell(row_idx: usize, column_idx: usize, table: &mut LinkedTable) {
+    let cell = match table.table[row_idx][column_idx] {
+        Link::EmptyLink => panic!("cannot reveal empty link"),
+        Link::ColumnHeader(_) => panic!("cannot reveal column header"),
+        Link::Cell(c) => c,
+    };
+
+    match &mut table.table[cell.up.unwrap()][column_idx] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(above_cell) => above_cell.down = Some(row_idx),
+        Link::ColumnHeader(above_ch) => above_ch.down = Some(row_idx),
+    }
+
+    match &mut table.table[cell.down.unwrap()][column_idx] {
+        Link::EmptyLink => panic!("invalid"),
+        Link::Cell(below_cell) => below_cell.up = Some(row_idx),
+        Link::ColumnHeader(below_ch) => below_ch.up = Some(row_idx),
+    }
+
+    match &mut table.table[0][column_idx] {
+        Link::ColumnHeader(ch) => ch.cell_count += 1,
         _ => panic!("invalid"),
     }
 }
@@ -427,6 +470,43 @@ fn cover_column(selected_column_idx: usize, table: &mut LinkedTable) {
     hide_column_header(selected_column_idx, table);
 }
 
+fn reveal_column(selected_column_idx: usize, table: &mut LinkedTable) {
+    let ch = match table.table[0][selected_column_idx] {
+        Link::EmptyLink => panic!("should be column header"),
+        Link::Cell(_) => panic!("should be column header"),
+        Link::ColumnHeader(ch) => ch,
+    };
+
+    let mut next_row_idx = ch.up.expect("Column header should have an up");
+
+    while next_row_idx != 0 {
+        let mut next_column_idx =
+            match table.table[next_row_idx][selected_column_idx] {
+                Link::EmptyLink => panic!("Should never point to empty link"),
+                Link::ColumnHeader(ch) => ch.left.unwrap(),
+                Link::Cell(c) => c.left.unwrap(),
+            };
+
+        while next_column_idx != selected_column_idx {
+            reveal_cell(next_row_idx, next_column_idx, table);
+
+            next_column_idx = match table.table[next_row_idx][next_column_idx] {
+                Link::EmptyLink => panic!("Should never point to empty link"),
+                Link::ColumnHeader(ch) => ch.left.unwrap(),
+                Link::Cell(c) => c.left.unwrap(),
+            };
+        }
+
+        next_row_idx = match table.table[next_row_idx][selected_column_idx] {
+            Link::EmptyLink => panic!("invalid"),
+            Link::ColumnHeader(ch) => ch.up.unwrap(),
+            Link::Cell(c) => c.up.unwrap(),
+        };
+    }
+
+    reveal_column_header(selected_column_idx, table);
+}
+
 fn generate_linked_table() -> LinkedTable {
     let mut table = LinkedTable::default();
     link_unlinked_table(&mut table);
@@ -452,6 +532,30 @@ fn hide_all_columns_in_row(
         if next_column_idx == column_idx {
             break;
         }
+    }
+}
+
+fn reveal_all_columns_in_row(
+    row_idx: usize,
+    column_idx: usize,
+    table: &mut LinkedTable,
+) {
+    let mut next_column_idx = match table.table[row_idx][column_idx] {
+        Link::Cell(c) => c.left.unwrap(),
+        _ => panic!(),
+    };
+
+    loop {
+        reveal_column(next_column_idx, table);
+
+        if next_column_idx == column_idx {
+            break;
+        }
+
+        next_column_idx = match table.table[row_idx][next_column_idx] {
+            Link::Cell(c) => c.left.unwrap(),
+            _ => panic!(),
+        };
     }
 }
 
