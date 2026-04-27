@@ -643,11 +643,27 @@ fn it_finds_all_expected_rows() {
     let mut linked_table = LinkedTable::default();
     link_unlinked_table(&mut linked_table);
 
-    let (selected_row, alternate_rows) =
-        find_satisfying_rows(14, &mut linked_table);
+    let satisfying_rows = find_satisfying_rows(14, &linked_table);
 
-    assert_eq!(selected_row, 87);
-    assert_eq!(alternate_rows, vec![96, 105, 114, 123, 132, 141, 150, 159]);
+    assert_eq!(
+        satisfying_rows,
+        Some((87, vec![96, 105, 114, 123, 132, 141, 150, 159]))
+    );
+}
+
+#[test]
+fn it_returns_none_when_column_has_no_cells() {
+    let mut linked_table = LinkedTable::default();
+
+    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 0,
+        up: None,
+        down: None,
+        left: Some(0),
+        right: Some(0),
+    });
+
+    assert_eq!(find_satisfying_rows(0, &linked_table), None);
 }
 
 fn generate_crafted_hide_all_columns_in_row_table() -> LinkedTable {

@@ -312,10 +312,10 @@ fn select_column(
 fn find_satisfying_rows(
     selected_column_idx: usize,
     table: &LinkedTable,
-) -> (usize, Vec<usize>) {
+) -> Option<(usize, Vec<usize>)> {
     // Literally just go to the ColumnHeader and find down
     let selected_row = match table.table[0][selected_column_idx] {
-        Link::ColumnHeader(ch) => ch.down.unwrap(),
+        Link::ColumnHeader(ch) => ch.down?,
         _ => panic!(),
     };
 
@@ -336,7 +336,7 @@ fn find_satisfying_rows(
         alternate_rows.push(next_row.unwrap());
     }
 
-    (selected_row, alternate_rows)
+    Some((selected_row, alternate_rows))
 }
 
 fn hide_column_header(column_idx: usize, table: &mut LinkedTable) {
@@ -581,7 +581,7 @@ pub fn launch_dancing_links() -> Vec<Board> {
         );
 
         let (selected_row, _alternate_rows) =
-            find_satisfying_rows(selected_column, &linked_table);
+            find_satisfying_rows(selected_column, &linked_table).unwrap();
         solution_set.push(selected_row);
 
         hide_all_columns_in_row(selected_row, selected_column, &mut linked_table);
