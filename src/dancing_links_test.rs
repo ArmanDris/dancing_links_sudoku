@@ -653,16 +653,7 @@ fn it_finds_all_expected_rows() {
 
 #[test]
 fn it_returns_none_when_column_has_no_cells() {
-    let typed_boxed_table: Box<
-        [[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS],
-    > = vec![[Link::EmptyLink; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]
-        .into_boxed_slice()
-        .try_into()
-        .unwrap();
-
-    let mut linked_table = LinkedTable {
-        table: typed_boxed_table,
-    };
+    let mut linked_table = LinkedTable::default();
 
     linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader {
         cell_count: 0,
