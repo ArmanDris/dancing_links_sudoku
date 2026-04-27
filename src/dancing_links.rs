@@ -519,10 +519,12 @@ fn hide_all_columns_in_row(
     row_idx: usize,
     column_idx: usize,
     table: &mut LinkedTable,
-) {
+) -> Vec<usize> {
     let mut next_column_idx = column_idx;
+    let mut hidden_columns = vec![];
 
     loop {
+        hidden_columns.push(next_column_idx);
         cover_column(next_column_idx, table);
         next_column_idx = match table.table[row_idx][next_column_idx] {
             Link::Cell(c) => c.right.unwrap(),
@@ -533,6 +535,8 @@ fn hide_all_columns_in_row(
             break;
         }
     }
+
+    hidden_columns
 }
 
 fn reveal_all_columns_in_row(
@@ -580,11 +584,7 @@ pub fn launch_dancing_links() -> Vec<Board> {
             find_satisfying_rows(selected_column, &linked_table);
         solution_set.push(selected_row);
 
-        hide_all_columns_in_row(
-            selected_column,
-            selected_row,
-            &mut linked_table,
-        );
+        hide_all_columns_in_row(selected_row, selected_column, &mut linked_table);
 
         if true {
             break;
