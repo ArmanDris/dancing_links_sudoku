@@ -917,9 +917,10 @@ fn it_coveres_all_columns_for_a_row() {
     });
 
     // Act - Hide column A (0), then D (3), then G (6)
-    hide_all_columns_in_row(2, 0, &mut linked_table);
+    let hidden_columns = hide_all_columns_in_row(2, 0, &mut linked_table);
 
     // Assert - The columns were each hidden in the correct order
+    assert_eq!(hidden_columns, vec![0, 3, 6]);
     assert_eq!(
         linked_table.table[0][0],
         Link::ColumnHeader(ColumnHeader {
