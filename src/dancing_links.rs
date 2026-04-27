@@ -571,7 +571,7 @@ pub fn launch_dancing_links() -> Vec<Board> {
     let mut solution_set: Vec<usize> = vec![];
     // Tuples where the first entry is the selected row, and the second is the
     // alternate rows.
-    let mut _decisions: Vec<(usize, Vec<usize>)> = vec![];
+    let mut decisions: Vec<(usize, Vec<usize>)> = vec![];
 
     loop {
         let selected_column = select_column(
@@ -580,16 +580,27 @@ pub fn launch_dancing_links() -> Vec<Board> {
             &linked_table,
         );
 
-        let (selected_row, _alternate_rows) =
+        let (selected_row, alternate_rows) =
             find_satisfying_rows(selected_column, &linked_table).unwrap();
         solution_set.push(selected_row);
+        decisions.push((selected_row, alternate_rows));
 
-        hide_all_columns_in_row(selected_row, selected_column, &mut linked_table);
+        let hidden_columns = hide_all_columns_in_row(
+            selected_row,
+            selected_column,
+            &mut linked_table,
+        );
 
-        if true {
+        unsatisfied_columns = unsatisfied_columns
+            .into_iter()
+            .filter(|col_idx| !hidden_columns.contains(col_idx))
+            .collect();
+
+        if decisions.len() == 81 {
             break;
         }
     }
 
-    vec![]
+    println!("SOLVED!");
+    panic!();
 }

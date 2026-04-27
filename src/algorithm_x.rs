@@ -61,7 +61,9 @@ fn map_constraint_to_column_idx(
     constraint_broad_value: usize,
     constraint_cell_value: usize,
 ) -> usize {
-    constraint_type.get_offset() + (constraint_broad_value * 9) + constraint_cell_value
+    constraint_type.get_offset()
+        + (constraint_broad_value * 9)
+        + constraint_cell_value
 }
 
 /// Generates a row in the constraint table using the choices represented by
@@ -73,7 +75,11 @@ fn fill_row_constraints(board: &Board, constraint_row: &mut [bool; 324]) {
         for cell_idx in 0..9 {
             let required_number = cell_idx as i32 + 1;
             if board_row.contains(&required_number) {
-                let index = map_constraint_to_column_idx(ConstraintType::Row, row_idx, cell_idx);
+                let index = map_constraint_to_column_idx(
+                    ConstraintType::Row,
+                    row_idx,
+                    cell_idx,
+                );
                 constraint_row[index] = true;
             }
         }
@@ -86,8 +92,11 @@ fn fill_column_constraints(board: &Board, constraint_row: &mut [bool; 324]) {
         for cell_idx in 0..9 {
             let required_number = cell_idx as i32 + 1;
             if board_column.contains(&required_number) {
-                let index =
-                    map_constraint_to_column_idx(ConstraintType::Column, column_idx, cell_idx);
+                let index = map_constraint_to_column_idx(
+                    ConstraintType::Column,
+                    column_idx,
+                    cell_idx,
+                );
                 constraint_row[index] = true;
             }
         }
@@ -106,17 +115,26 @@ fn fill_sub_grid_constraints(board: &Board, constraint_row: &mut [bool; 324]) {
         for sub_grid_x_start in (0..9).step_by(3) {
             let mut sub_grid_numbers: Vec<i32> = vec![];
             // Add row 1
-            sub_grid_numbers.push(board.get(sub_grid_y_start, sub_grid_x_start));
-            sub_grid_numbers.push(board.get(sub_grid_y_start, sub_grid_x_start + 1));
-            sub_grid_numbers.push(board.get(sub_grid_y_start, sub_grid_x_start + 2));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start, sub_grid_x_start));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start, sub_grid_x_start + 1));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start, sub_grid_x_start + 2));
             // Add row 2
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 1, sub_grid_x_start));
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 1, sub_grid_x_start + 1));
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 1, sub_grid_x_start + 2));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 1, sub_grid_x_start));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 1, sub_grid_x_start + 1));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 1, sub_grid_x_start + 2));
             // Add row 3
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 2, sub_grid_x_start));
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 2, sub_grid_x_start + 1));
-            sub_grid_numbers.push(board.get(sub_grid_y_start + 2, sub_grid_x_start + 2));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 2, sub_grid_x_start));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 2, sub_grid_x_start + 1));
+            sub_grid_numbers
+                .push(board.get(sub_grid_y_start + 2, sub_grid_x_start + 2));
 
             for cell_idx in 0..9 {
                 let required_number = cell_idx as i32 + 1;
@@ -137,7 +155,11 @@ fn fill_existence_constraints(board: &Board, constraint_row: &mut [bool; 324]) {
     for row_idx in 0..9 {
         for col_idx in 0..9 {
             let cell_has_value = board.get(col_idx, row_idx) != 0;
-            let index = map_constraint_to_column_idx(ConstraintType::Existence, row_idx, col_idx);
+            let index = map_constraint_to_column_idx(
+                ConstraintType::Existence,
+                row_idx,
+                col_idx,
+            );
             constraint_row[index] = cell_has_value;
         }
     }
@@ -258,14 +280,19 @@ pub enum DecisionStrategy {
 /// row defined by strategy, then returns a tuple where
 /// the first element is the selected row and the second
 /// element is the remaining rows.
-fn pick_row(mut possible_rows: Vec<usize>, strategy: DecisionStrategy) -> (usize, Vec<usize>) {
+fn pick_row(
+    mut possible_rows: Vec<usize>,
+    strategy: DecisionStrategy,
+) -> (usize, Vec<usize>) {
     if possible_rows.is_empty() {
         panic!("Cannot pick row from empty array")
     }
 
     let selected_row_index = match strategy {
         DecisionStrategy::First => 0,
-        DecisionStrategy::Random => rand::thread_rng().gen_range(0..possible_rows.len()),
+        DecisionStrategy::Random => {
+            rand::thread_rng().gen_range(0..possible_rows.len())
+        }
     };
 
     let selected_row = possible_rows.swap_remove(selected_row_index);
@@ -332,7 +359,9 @@ fn backtrack(
 
     let popped_decision = match popped_decisions.pop() {
         Some(d) => d,
-        None => panic!("If we are here there should have been at least one popped decision"),
+        None => panic!(
+            "If we are here there should have been at least one popped decision"
+        ),
     };
 
     pick_row(popped_decision.potential_rows, decision_strategy)
@@ -371,7 +400,8 @@ fn map_board_to_solution_set(board: &Board) -> HashSet<usize> {
             if cell == 0 {
                 continue;
             }
-            let constraint_table_row = (row_index * 9 * 9) + (column_index * 9) + cell as usize - 1;
+            let constraint_table_row =
+                (row_index * 9 * 9) + (column_index * 9) + cell as usize - 1;
             solution_set.insert(constraint_table_row);
         }
     }
@@ -387,15 +417,18 @@ fn generate_initial_state(
         Some(board) => map_board_to_solution_set(&board),
         None => HashSet::new(),
     };
-    let initial_hidden_rows =
-        initial_solution_set
-            .iter()
-            .fold(HashSet::new(), |mut accumulator, row_index| {
-                let conflicting_rows =
-                    get_conflicting_rows(&constraint_table, &accumulator, *row_index);
-                accumulator.extend(conflicting_rows);
-                accumulator
-            });
+    let initial_hidden_rows = initial_solution_set.iter().fold(
+        HashSet::new(),
+        |mut accumulator, row_index| {
+            let conflicting_rows = get_conflicting_rows(
+                &constraint_table,
+                &accumulator,
+                *row_index,
+            );
+            accumulator.extend(conflicting_rows);
+            accumulator
+        },
+    );
     (initial_solution_set, initial_hidden_rows)
 }
 
@@ -421,7 +454,8 @@ pub fn launch_algorithm_x(
     //  - there are 81 cells (81)
     // 9 * 81 = 729 choices
 
-    let decision_strategy = decision_strategy.unwrap_or(DecisionStrategy::Random);
+    let decision_strategy =
+        decision_strategy.unwrap_or(DecisionStrategy::Random);
     let desired_solutions = desired_solutions.unwrap_or(1);
     let mut solutions: Vec<Board> = vec![];
 
@@ -438,7 +472,8 @@ pub fn launch_algorithm_x(
     loop {
         // Step 1: Pick an unsatisifed constraint
         let unsatisfied_column_idx =
-            match find_unsatisfied_constraint(&constraint_table, &solution_set) {
+            match find_unsatisfied_constraint(&constraint_table, &solution_set)
+            {
                 Some(index) => index,
                 None => {
                     solutions.push(map_solution_set_to_board(&solution_set));
@@ -451,7 +486,11 @@ pub fn launch_algorithm_x(
                         &mut solution_set,
                         decision_strategy,
                     );
-                    find_unsatisfied_constraint(&constraint_table, &solution_set).unwrap()
+                    find_unsatisfied_constraint(
+                        &constraint_table,
+                        &solution_set,
+                    )
+                    .unwrap()
                 }
             };
 
@@ -471,8 +510,11 @@ pub fn launch_algorithm_x(
         //      and return those two values as the tuple
         //      (selected_row, possible_rows) to be turned into the next
         //      decision. (possible rows is the calculated conflicting rows)
-        let satisfying_rows =
-            find_satisfying_rows(&constraint_table, &hidden_rows, unsatisfied_column_idx);
+        let satisfying_rows = find_satisfying_rows(
+            &constraint_table,
+            &hidden_rows,
+            unsatisfied_column_idx,
+        );
 
         let (selected_row, possible_rows) = match satisfying_rows.is_empty() {
             false => pick_row(satisfying_rows, decision_strategy),
@@ -488,7 +530,8 @@ pub fn launch_algorithm_x(
         solution_set.insert(selected_row);
 
         // Step 4: Remove any rows that satisfy any of the constraitns satisfied by the chosen row
-        let conflicting_rows = get_conflicting_rows(&constraint_table, &hidden_rows, selected_row);
+        let conflicting_rows =
+            get_conflicting_rows(&constraint_table, &hidden_rows, selected_row);
 
         hidden_rows.extend(conflicting_rows.iter().copied());
 

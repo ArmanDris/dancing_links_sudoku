@@ -55,11 +55,13 @@ fn correctly_resolves_two_rows() {
 
     // fourth row will be from index [3*9, 4*9)
     let fourth_row_section_of_constraints = &constraint_row[27..36];
-    let expected_fourth_row = [false, false, false, false, true, true, true, true, false];
+    let expected_fourth_row =
+        [false, false, false, false, true, true, true, true, false];
     assert_eq!(fourth_row_section_of_constraints, expected_fourth_row);
 
     let sixth_row_section_of_constraints = &constraint_row[45..54];
-    let expected_sixth_row = [true, false, false, true, true, false, false, true, false];
+    let expected_sixth_row =
+        [true, false, false, true, true, false, false, true, false];
     assert_eq!(sixth_row_section_of_constraints, expected_sixth_row);
 }
 
@@ -110,7 +112,8 @@ fn test_detects_two_random_column_constraints() {
     fill_column_constraints(&board, &mut column_constraints);
 
     let column_two_offset = ConstraintType::Column.get_offset() + (9 * 2);
-    let column_two_constraints = &column_constraints[column_two_offset..(column_two_offset + 9)];
+    let column_two_constraints =
+        &column_constraints[column_two_offset..(column_two_offset + 9)];
 
     let expected_column_two_constraints =
         [true, true, false, false, true, false, false, false, false];
@@ -168,20 +171,24 @@ fn test_detects_sub_grid_constraints() {
     let mut sub_grid_constraints = [false; 324];
     fill_sub_grid_constraints(&board, &mut sub_grid_constraints);
 
-    let top_left_constraints = &sub_grid_constraints[top_left_offset..(top_left_offset + 9)];
-    let expected_top_left_constraints = [true, true, false, true, true, false, false, false, true];
+    let top_left_constraints =
+        &sub_grid_constraints[top_left_offset..(top_left_offset + 9)];
+    let expected_top_left_constraints =
+        [true, true, false, true, true, false, false, false, true];
     assert_eq!(top_left_constraints, expected_top_left_constraints);
 
     let middle_sub_grid_offset = ConstraintType::SubGrid.get_offset() + (9 * 4);
-    let middle_constraints =
-        &sub_grid_constraints[middle_sub_grid_offset..(middle_sub_grid_offset + 9)];
-    let expected_middle_constraints = [true, false, true, true, true, false, false, false, true];
+    let middle_constraints = &sub_grid_constraints
+        [middle_sub_grid_offset..(middle_sub_grid_offset + 9)];
+    let expected_middle_constraints =
+        [true, false, true, true, true, false, false, false, true];
     assert_eq!(middle_constraints, expected_middle_constraints);
 
     let bottom_left_offset = ConstraintType::SubGrid.get_offset() + (9 * 8);
     let bottom_left_constraints =
         &sub_grid_constraints[bottom_left_offset..(bottom_left_offset + 9)];
-    let expected_bottom_left_constraints = [false, true, true, true, true, true, true, true, true];
+    let expected_bottom_left_constraints =
+        [false, true, true, true, true, true, true, true, true];
     assert_eq!(bottom_left_constraints, expected_bottom_left_constraints);
 }
 
@@ -335,11 +342,19 @@ fn test_generate_constraint_table() {
     // Asserting that the "Row 4 has a 7" constraint is true for choice "Place 7 at 8, 4"
     assert!(second_choice_row[(9 * 4) + 7 - 1]);
     // Asserting that the "Column 8 has a 7" constraint is true for choice "Place 7 at 8,4"
-    assert!(second_choice_row[ConstraintType::Column.get_offset() + (9 * 8) + 7 - 1]);
+    assert!(
+        second_choice_row
+            [ConstraintType::Column.get_offset() + (9 * 8) + 7 - 1]
+    );
     // Asserting that the "Subgrid 5 has a 7" constraint is true for choice "Place 7 at 8,4"
-    assert!(second_choice_row[ConstraintType::SubGrid.get_offset() + (9 * 5) + 7 - 1]);
+    assert!(
+        second_choice_row
+            [ConstraintType::SubGrid.get_offset() + (9 * 5) + 7 - 1]
+    );
     // Asserting that the "Cell 8,4 has a value" constraint is true for choice "Place 7 at 8,4"
-    assert!(second_choice_row[ConstraintType::Existence.get_offset() + (4 * 9) + 8]);
+    assert!(
+        second_choice_row[ConstraintType::Existence.get_offset() + (4 * 9) + 8]
+    );
     // Asserting that all other constraints are false
     assert!(second_choice_row.iter().filter(|var| **var).count() == 4);
 
@@ -350,7 +365,9 @@ fn test_generate_constraint_table() {
     // Assert that the "Row 0 has a 1" constraint is true for "Place 1 at 3,0"
     assert!(third_choice_row[1 - 1]);
     // Assert that the "Column 3 has a 1" constraint is true for "Place 1 at 3,0"
-    assert!(third_choice_row[ConstraintType::Column.get_offset() + (9 * 3) + 1 - 1]);
+    assert!(
+        third_choice_row[ConstraintType::Column.get_offset() + (9 * 3) + 1 - 1]
+    );
     // Assert that the "Subgrid 1 has a 1" constraint is true for "Place 1 at 3,0"
     assert!(third_choice_row[ConstraintType::SubGrid.get_offset() + 9 + 1 - 1]);
     // Assert that all other constraints are false
@@ -478,7 +495,8 @@ fn test_pick_row() {
 
     // Multiple elements, First strategy: selects index 0, remainder is original without that element
     let input = vec![10, 20, 30, 40];
-    let (selected, remaining) = pick_row(input.clone(), DecisionStrategy::First);
+    let (selected, remaining) =
+        pick_row(input.clone(), DecisionStrategy::First);
     assert_eq!(selected, 10);
     assert_eq!(remaining.len(), input.len() - 1);
 
@@ -493,7 +511,8 @@ fn test_pick_row() {
     // Multiple elements, Random strategy:
     // We can't assert which element was picked, but we can assert invariants.
     let input = vec![1, 2, 3, 4, 5];
-    let (selected, remaining) = pick_row(input.clone(), DecisionStrategy::Random);
+    let (selected, remaining) =
+        pick_row(input.clone(), DecisionStrategy::Random);
     assert_eq!(remaining.len(), input.len() - 1);
     assert!(input.contains(&selected));
 
@@ -523,7 +542,8 @@ fn test_backtracking() {
             rows_conflicting_with_selected_row: vec![13, 14, 15],
         },
     ];
-    let mut hidden_rows: HashSet<usize> = HashSet::from([4, 5, 6, 8, 9, 10, 13, 14, 15]);
+    let mut hidden_rows: HashSet<usize> =
+        HashSet::from([4, 5, 6, 8, 9, 10, 13, 14, 15]);
     let mut solution_set: HashSet<usize> = HashSet::from([0, 7, 11]);
 
     let (selected_row, potential_rows) = backtrack(
@@ -708,58 +728,70 @@ fn test_generate_initial_state() {
     assert_eq!(
         generated_solution_set,
         HashSet::from([
-            107, 305, 128, 360, 118, 205, 401, 236, 87, 80, 264, 226, 10, 70, 148, 50, 156, 140,
-            216, 252, 346, 97, 20, 215, 175, 30, 108, 185, 60, 272, 165, 322, 352, 326, 390, 292,
-            40, 244, 195, 284, 312, 0
+            107, 305, 128, 360, 118, 205, 401, 236, 87, 80, 264, 226, 10, 70,
+            148, 50, 156, 140, 216, 252, 346, 97, 20, 215, 175, 30, 108, 185,
+            60, 272, 165, 322, 352, 326, 390, 292, 40, 244, 195, 284, 312, 0
         ])
     );
 
     let constraint_table = generate_constraint_table().table;
 
-    let generated_hidden_rows =
-        generated_solution_set
-            .iter()
-            .fold(HashSet::new(), |mut accumulator, row_index| {
-                let conflicting_rows =
-                    get_conflicting_rows(&constraint_table, &accumulator, *row_index);
-                accumulator.extend(conflicting_rows);
-                accumulator
-            });
+    let generated_hidden_rows = generated_solution_set.iter().fold(
+        HashSet::new(),
+        |mut accumulator, row_index| {
+            let conflicting_rows = get_conflicting_rows(
+                &constraint_table,
+                &accumulator,
+                *row_index,
+            );
+            accumulator.extend(conflicting_rows);
+            accumulator
+        },
+    );
 
     assert_eq!(
         generated_hidden_rows,
         HashSet::from([
-            432, 29, 596, 278, 633, 398, 247, 492, 34, 306, 211, 338, 75, 476, 26, 184, 92, 196,
-            684, 499, 676, 577, 327, 359, 363, 697, 489, 425, 4, 361, 658, 228, 396, 255, 418, 378,
-            111, 114, 210, 671, 485, 290, 275, 529, 366, 11, 441, 288, 162, 267, 595, 329, 8, 274,
-            723, 459, 136, 251, 427, 235, 539, 455, 385, 367, 552, 121, 402, 315, 458, 42, 266, 39,
-            132, 707, 616, 129, 349, 380, 190, 523, 311, 382, 56, 442, 509, 405, 257, 393, 89, 403,
-            119, 634, 52, 207, 57, 695, 641, 253, 32, 546, 364, 356, 636, 443, 590, 53, 117, 137,
-            282, 212, 610, 76, 436, 220, 152, 664, 84, 454, 677, 516, 71, 113, 421, 462, 59, 74,
-            238, 553, 287, 362, 17, 482, 12, 246, 109, 139, 388, 19, 567, 303, 151, 90, 506, 145,
-            573, 570, 434, 295, 88, 300, 452, 342, 373, 689, 27, 314, 678, 654, 55, 383, 717, 276,
-            263, 431, 626, 45, 78, 104, 642, 54, 100, 112, 219, 103, 221, 213, 188, 245, 150, 583,
-            670, 249, 68, 391, 576, 519, 535, 258, 158, 394, 293, 384, 313, 168, 317, 72, 438, 386,
-            101, 445, 13, 110, 323, 187, 149, 631, 146, 28, 301, 6, 270, 357, 16, 234, 231, 600,
-            372, 85, 513, 155, 484, 649, 472, 153, 202, 254, 354, 728, 340, 637, 138, 483, 157,
-            669, 608, 161, 561, 681, 644, 243, 91, 347, 351, 343, 299, 120, 548, 397, 614, 374,
-            487, 550, 469, 515, 522, 514, 344, 83, 597, 224, 332, 166, 125, 540, 381, 467, 399,
-            309, 63, 18, 122, 471, 387, 594, 714, 480, 179, 433, 48, 556, 406, 73, 7, 289, 201,
-            651, 414, 486, 256, 404, 49, 98, 331, 533, 66, 62, 159, 222, 334, 426, 163, 508, 144,
-            675, 135, 423, 58, 698, 512, 192, 61, 281, 265, 727, 336, 674, 328, 1, 198, 99, 229,
-            408, 93, 350, 174, 134, 116, 147, 569, 194, 371, 102, 330, 368, 67, 232, 428, 37, 589,
-            2, 131, 22, 31, 79, 286, 241, 563, 106, 46, 164, 181, 603, 280, 44, 320, 277, 127, 718,
-            657, 248, 648, 588, 474, 337, 379, 172, 333, 646, 218, 262, 64, 607, 502, 171, 23, 464,
-            446, 369, 173, 725, 593, 587, 230, 691, 41, 496, 617, 3, 715, 279, 450, 395, 479, 297,
-            465, 204, 142, 35, 9, 495, 269, 209, 566, 712, 21, 400, 177, 273, 176, 160, 123, 186,
-            415, 82, 86, 661, 217, 214, 560, 197, 298, 291, 365, 650, 555, 437, 77, 407, 95, 193,
-            124, 51, 417, 259, 182, 302, 304, 668, 94, 318, 527, 261, 271, 14, 701, 199, 488, 36,
-            702, 283, 296, 451, 627, 688, 377, 621, 69, 180, 96, 237, 409, 141, 189, 169, 200, 310,
-            389, 448, 370, 466, 208, 308, 629, 545, 24, 115, 321, 565, 353, 227, 507, 203, 416,
-            647, 206, 65, 604, 335, 536, 710, 435, 15, 294, 355, 475, 183, 580, 392, 47, 722, 154,
-            191, 126, 223, 268, 239, 170, 319, 81, 260, 348, 242, 130, 233, 324, 250, 411, 133,
-            307, 325, 473, 316, 240, 358, 38, 43, 143, 167, 33, 708, 105, 620, 25, 285, 526, 568,
-            5, 178, 424, 345, 225, 685
+            432, 29, 596, 278, 633, 398, 247, 492, 34, 306, 211, 338, 75, 476,
+            26, 184, 92, 196, 684, 499, 676, 577, 327, 359, 363, 697, 489, 425,
+            4, 361, 658, 228, 396, 255, 418, 378, 111, 114, 210, 671, 485, 290,
+            275, 529, 366, 11, 441, 288, 162, 267, 595, 329, 8, 274, 723, 459,
+            136, 251, 427, 235, 539, 455, 385, 367, 552, 121, 402, 315, 458,
+            42, 266, 39, 132, 707, 616, 129, 349, 380, 190, 523, 311, 382, 56,
+            442, 509, 405, 257, 393, 89, 403, 119, 634, 52, 207, 57, 695, 641,
+            253, 32, 546, 364, 356, 636, 443, 590, 53, 117, 137, 282, 212, 610,
+            76, 436, 220, 152, 664, 84, 454, 677, 516, 71, 113, 421, 462, 59,
+            74, 238, 553, 287, 362, 17, 482, 12, 246, 109, 139, 388, 19, 567,
+            303, 151, 90, 506, 145, 573, 570, 434, 295, 88, 300, 452, 342, 373,
+            689, 27, 314, 678, 654, 55, 383, 717, 276, 263, 431, 626, 45, 78,
+            104, 642, 54, 100, 112, 219, 103, 221, 213, 188, 245, 150, 583,
+            670, 249, 68, 391, 576, 519, 535, 258, 158, 394, 293, 384, 313,
+            168, 317, 72, 438, 386, 101, 445, 13, 110, 323, 187, 149, 631, 146,
+            28, 301, 6, 270, 357, 16, 234, 231, 600, 372, 85, 513, 155, 484,
+            649, 472, 153, 202, 254, 354, 728, 340, 637, 138, 483, 157, 669,
+            608, 161, 561, 681, 644, 243, 91, 347, 351, 343, 299, 120, 548,
+            397, 614, 374, 487, 550, 469, 515, 522, 514, 344, 83, 597, 224,
+            332, 166, 125, 540, 381, 467, 399, 309, 63, 18, 122, 471, 387, 594,
+            714, 480, 179, 433, 48, 556, 406, 73, 7, 289, 201, 651, 414, 486,
+            256, 404, 49, 98, 331, 533, 66, 62, 159, 222, 334, 426, 163, 508,
+            144, 675, 135, 423, 58, 698, 512, 192, 61, 281, 265, 727, 336, 674,
+            328, 1, 198, 99, 229, 408, 93, 350, 174, 134, 116, 147, 569, 194,
+            371, 102, 330, 368, 67, 232, 428, 37, 589, 2, 131, 22, 31, 79, 286,
+            241, 563, 106, 46, 164, 181, 603, 280, 44, 320, 277, 127, 718, 657,
+            248, 648, 588, 474, 337, 379, 172, 333, 646, 218, 262, 64, 607,
+            502, 171, 23, 464, 446, 369, 173, 725, 593, 587, 230, 691, 41, 496,
+            617, 3, 715, 279, 450, 395, 479, 297, 465, 204, 142, 35, 9, 495,
+            269, 209, 566, 712, 21, 400, 177, 273, 176, 160, 123, 186, 415, 82,
+            86, 661, 217, 214, 560, 197, 298, 291, 365, 650, 555, 437, 77, 407,
+            95, 193, 124, 51, 417, 259, 182, 302, 304, 668, 94, 318, 527, 261,
+            271, 14, 701, 199, 488, 36, 702, 283, 296, 451, 627, 688, 377, 621,
+            69, 180, 96, 237, 409, 141, 189, 169, 200, 310, 389, 448, 370, 466,
+            208, 308, 629, 545, 24, 115, 321, 565, 353, 227, 507, 203, 416,
+            647, 206, 65, 604, 335, 536, 710, 435, 15, 294, 355, 475, 183, 580,
+            392, 47, 722, 154, 191, 126, 223, 268, 239, 170, 319, 81, 260, 348,
+            242, 130, 233, 324, 250, 411, 133, 307, 325, 473, 316, 240, 358,
+            38, 43, 143, 167, 33, 708, 105, 620, 25, 285, 526, 568, 5, 178,
+            424, 345, 225, 685
         ])
     );
 }
@@ -863,7 +895,8 @@ fn test_no_unnecessary_backtracks() {
 
     let mut zero_exists = false;
     for row_idx in 0..9 {
-        zero_exists = zero_exists || solution.get_row(row_idx).iter().any(|e| e == &0);
+        zero_exists =
+            zero_exists || solution.get_row(row_idx).iter().any(|e| e == &0);
     }
     assert_eq!(zero_exists, false);
 }
@@ -875,7 +908,8 @@ fn test_algorithm_x() {
 
     let mut zero_exists = false;
     for row_idx in 0..9 {
-        zero_exists = zero_exists || solution.get_row(row_idx).iter().any(|e| e == &0);
+        zero_exists =
+            zero_exists || solution.get_row(row_idx).iter().any(|e| e == &0);
     }
     assert_eq!(zero_exists, false);
 }
