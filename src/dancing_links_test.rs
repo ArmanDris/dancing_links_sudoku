@@ -650,6 +650,217 @@ fn it_finds_all_expected_rows() {
     assert_eq!(alternate_rows, vec![96, 105, 114, 123, 132, 141, 150, 159]);
 }
 
+fn generate_crafted_hide_all_columns_in_row_table() -> LinkedTable {
+    let typed_boxed_table: Box<
+        [[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS],
+    > = vec![[Link::EmptyLink; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]
+        .into_boxed_slice()
+        .try_into()
+        .unwrap();
+
+    let mut linked_table = LinkedTable {
+        table: typed_boxed_table,
+    };
+    // Column headers
+    linked_table.table[0][0] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(4),
+        down: Some(2),
+        left: Some(6),
+        right: Some(1),
+    });
+    linked_table.table[0][1] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(5),
+        down: Some(3),
+        left: Some(0),
+        right: Some(2),
+    });
+    linked_table.table[0][2] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(3),
+        down: Some(1),
+        left: Some(1),
+        right: Some(3),
+    });
+    linked_table.table[0][3] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 3,
+        up: Some(6),
+        down: Some(2),
+        left: Some(2),
+        right: Some(4),
+    });
+    linked_table.table[0][4] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(6),
+        down: Some(1),
+        left: Some(3),
+        right: Some(5),
+    });
+    linked_table.table[0][5] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 2,
+        up: Some(3),
+        down: Some(1),
+        left: Some(4),
+        right: Some(6),
+    });
+    linked_table.table[0][6] = Link::ColumnHeader(ColumnHeader {
+        cell_count: 3,
+        up: Some(6),
+        down: Some(2),
+        left: Some(5),
+        right: Some(0),
+    });
+    // Row 1
+    linked_table.table[1][2] = Link::Cell(Cell {
+        column_index: 2,
+        row_index: 1,
+        up: Some(0),
+        down: Some(3),
+        left: Some(5),
+        right: Some(4),
+    });
+    linked_table.table[1][4] = Link::Cell(Cell {
+        column_index: 4,
+        row_index: 1,
+        up: Some(0),
+        down: Some(6),
+        left: Some(2),
+        right: Some(5),
+    });
+    linked_table.table[1][5] = Link::Cell(Cell {
+        column_index: 5,
+        row_index: 1,
+        up: Some(0),
+        down: Some(3),
+        left: Some(4),
+        right: Some(2),
+    });
+    // Row 2
+    linked_table.table[2][0] = Link::Cell(Cell {
+        column_index: 0,
+        row_index: 2,
+        up: Some(0),
+        down: Some(4),
+        left: Some(6),
+        right: Some(3),
+    });
+    linked_table.table[2][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 2,
+        up: Some(0),
+        down: Some(4),
+        left: Some(0),
+        right: Some(6),
+    });
+    linked_table.table[2][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 2,
+        up: Some(0),
+        down: Some(5),
+        left: Some(3),
+        right: Some(0),
+    });
+    // Row 3
+    linked_table.table[3][1] = Link::Cell(Cell {
+        column_index: 1,
+        row_index: 3,
+        up: Some(0),
+        down: Some(5),
+        left: Some(5),
+        right: Some(2),
+    });
+    linked_table.table[3][2] = Link::Cell(Cell {
+        column_index: 2,
+        row_index: 3,
+        up: Some(1),
+        down: Some(0),
+        left: Some(1),
+        right: Some(5),
+    });
+    linked_table.table[3][5] = Link::Cell(Cell {
+        column_index: 5,
+        row_index: 3,
+        up: Some(1),
+        down: Some(0),
+        left: Some(2),
+        right: Some(1),
+    });
+    // Row 4
+    linked_table.table[4][0] = Link::Cell(Cell {
+        column_index: 0,
+        row_index: 4,
+        up: Some(2),
+        down: Some(0),
+        left: Some(3),
+        right: Some(3),
+    });
+    linked_table.table[4][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 4,
+        up: Some(2),
+        down: Some(6),
+        left: Some(0),
+        right: Some(0),
+    });
+    // Row 5
+    linked_table.table[5][1] = Link::Cell(Cell {
+        column_index: 1,
+        row_index: 5,
+        up: Some(3),
+        down: Some(0),
+        left: Some(6),
+        right: Some(6),
+    });
+    linked_table.table[5][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 5,
+        up: Some(2),
+        down: Some(6),
+        left: Some(1),
+        right: Some(1),
+    });
+    // Row 6
+    linked_table.table[6][3] = Link::Cell(Cell {
+        column_index: 3,
+        row_index: 6,
+        up: Some(4),
+        down: Some(0),
+        left: Some(6),
+        right: Some(4),
+    });
+    linked_table.table[6][4] = Link::Cell(Cell {
+        column_index: 4,
+        row_index: 6,
+        up: Some(1),
+        down: Some(0),
+        left: Some(3),
+        right: Some(6),
+    });
+    linked_table.table[6][6] = Link::Cell(Cell {
+        column_index: 6,
+        row_index: 6,
+        up: Some(5),
+        down: Some(0),
+        left: Some(4),
+        right: Some(3),
+    });
+
+    linked_table
+}
+
+fn assert_crafted_table_eq(actual: &LinkedTable, expected: &LinkedTable) {
+    for row_idx in 0..7 {
+        for column_idx in 0..7 {
+            assert_eq!(
+                actual.table[row_idx][column_idx],
+                expected.table[row_idx][column_idx],
+                "mismatch at row {row_idx}, column {column_idx}"
+            );
+        }
+    }
+}
+
 #[test]
 fn it_coveres_all_columns_for_a_row() {
     // Starting with this grid:
@@ -1172,4 +1383,31 @@ fn it_coveres_all_columns_for_a_row() {
             right: Some(3)
         })
     );
+}
+
+#[test]
+fn it_reveals_all_columns_for_a_row() {
+    let original_table = generate_crafted_hide_all_columns_in_row_table();
+    let mut linked_table = generate_crafted_hide_all_columns_in_row_table();
+
+    hide_all_columns_in_row(2, 0, &mut linked_table);
+    reveal_all_columns_in_row(2, 0, &mut linked_table);
+
+    assert_crafted_table_eq(&linked_table, &original_table);
+}
+
+#[test]
+fn it_reveals_multiple_hidden_rows_in_reverse_order() {
+    let original_table = generate_crafted_hide_all_columns_in_row_table();
+    let mut linked_table = generate_crafted_hide_all_columns_in_row_table();
+
+    hide_all_columns_in_row(4, 0, &mut linked_table);
+    hide_all_columns_in_row(5, 1, &mut linked_table);
+    hide_all_columns_in_row(1, 2, &mut linked_table);
+
+    reveal_all_columns_in_row(1, 2, &mut linked_table);
+    reveal_all_columns_in_row(5, 1, &mut linked_table);
+    reveal_all_columns_in_row(4, 0, &mut linked_table);
+
+    assert_crafted_table_eq(&linked_table, &original_table);
 }
