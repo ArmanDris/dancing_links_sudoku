@@ -1,10 +1,7 @@
 use rand::Rng;
 use std::array;
 
-use crate::{
-    Board,
-    algorithm_x::{ConstraintTable, generate_constraint_table},
-};
+use crate::algorithm_x::{ConstraintTable, generate_constraint_table};
 
 #[cfg(test)]
 #[path = "dancing_links_test.rs"]
@@ -43,11 +40,21 @@ struct LinkedTable {
     table: Box<[[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]>,
 }
 /// Strategy to select the next column in Dancing Links search
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DecisionStrategy {
     First,
     Random,
     Optimal,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Decision {
+    selected_column: usize,
+    selected_row: usize,
+    potential_rows: Vec<usize>,
+    hidden_columns: Vec<usize>,
 }
 
 impl Default for LinkedTable {
@@ -315,7 +322,10 @@ fn find_satisfying_rows(
 ) -> Option<(usize, Vec<usize>)> {
     // Literally just go to the ColumnHeader and find down
     let selected_row = match table.table[0][selected_column_idx] {
-        Link::ColumnHeader(ch) => ch.down?,
+        Link::ColumnHeader(ch) => match ch.down {
+            Some(0) | None => return None,
+            Some(row_idx) => row_idx,
+        },
         _ => panic!(),
     };
 
@@ -337,6 +347,24 @@ fn find_satisfying_rows(
     }
 
     Some((selected_row, alternate_rows))
+}
+
+fn pick_row(
+    potential_rows: &mut Vec<usize>,
+    decision_strategy: DecisionStrategy,
+) -> usize {
+    if potential_rows.is_empty() {
+        panic!("Cannot pick row from empty array");
+    }
+
+    let selected_row_index = match decision_strategy {
+        DecisionStrategy::First | DecisionStrategy::Optimal => 0,
+        DecisionStrategy::Random => {
+            rand::thread_rng().gen_range(0..potential_rows.len())
+        }
+    };
+
+    potential_rows.swap_remove(selected_row_index)
 }
 
 fn hide_column_header(column_idx: usize, table: &mut LinkedTable) {
@@ -563,44 +591,140 @@ fn reveal_all_columns_in_row(
     }
 }
 
-pub fn launch_dancing_links() -> Vec<Board> {
-    let mut linked_table = generate_linked_table();
+fn solve_dancing_links(
+    table: &mut LinkedTable,
+    decision_strategy: DecisionStrategy,
+) -> Vec<usize> {
+    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
+    let mut solution = vec![];
 
-    let mut unsatisfied_columns: Vec<usize> =
-        (0..LINKED_TABLE_COLUMNS).collect();
-    let mut solution_set: Vec<usize> = vec![];
-    // Tuples where the first entry is the selected row, and the second is the
-    // alternate rows.
-    let mut decisions: Vec<(usize, Vec<usize>)> = vec![];
+    let was_solved =
+        search(table, &mut active_columns, &mut solution, decision_strategy);
 
-    loop {
-        let selected_column = select_column(
-            &mut unsatisfied_columns,
-            DecisionStrategy::First,
-            &linked_table,
-        );
+    if !was_solved {
+        panic!("Dancing Links search could not find a valid solution");
+    }
 
-        let (selected_row, alternate_rows) =
-            find_satisfying_rows(selected_column, &linked_table).unwrap();
-        solution_set.push(selected_row);
-        decisions.push((selected_row, alternate_rows));
+    solution
+}
 
-        let hidden_columns = hide_all_columns_in_row(
-            selected_row,
-            selected_column,
-            &mut linked_table,
-        );
+fn search(
+    table: &mut LinkedTable,
+    active_columns: &mut [bool; LINKED_TABLE_COLUMNS],
+    solution: &mut Vec<usize>,
+    decision_strategy: DecisionStrategy,
+) -> bool {
+    if active_columns.iter().all(|is_active| !is_active) {
+        return true;
+    }
 
-        unsatisfied_columns = unsatisfied_columns
-            .into_iter()
-            .filter(|col_idx| !hidden_columns.contains(col_idx))
-            .collect();
+    let mut unsatisfied_columns: Vec<usize> = active_columns
+        .iter()
+        .enumerate()
+        .filter_map(
+            |(column_idx, is_active)| {
+                if *is_active { Some(column_idx) } else { None }
+            },
+        )
+        .collect();
 
-        if decisions.len() == 81 {
-            break;
+    let selected_column =
+        select_column(&mut unsatisfied_columns, decision_strategy, table);
+
+    let (selected_row, alternate_rows) =
+        match find_satisfying_rows(selected_column, table) {
+            Some(rows) => rows,
+            None => return false,
+        };
+
+    let mut candidate_rows = vec![selected_row];
+    candidate_rows.extend(alternate_rows);
+
+    while !candidate_rows.is_empty() {
+        let selected_row = pick_row(&mut candidate_rows, decision_strategy);
+        let hidden_columns =
+            hide_all_columns_in_row(selected_row, selected_column, table);
+        for &column_idx in &hidden_columns {
+            active_columns[column_idx] = false;
+        }
+        solution.push(selected_row);
+
+        if search(table, active_columns, solution, decision_strategy) {
+            return true;
+        }
+
+        solution.pop();
+        reveal_all_columns_in_row(selected_row, selected_column, table);
+        for &column_idx in &hidden_columns {
+            active_columns[column_idx] = true;
         }
     }
 
-    println!("SOLVED!");
-    panic!();
+    false
+}
+
+fn map_linked_row_to_decision_row(
+    table: &LinkedTable,
+    linked_row_idx: usize,
+) -> usize {
+    table.table[linked_row_idx]
+        .iter()
+        .find_map(|link| match link {
+            Link::Cell(cell) => Some(cell.row_index),
+            _ => None,
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "linked row {linked_row_idx} did not contain a decision cell"
+            )
+        })
+}
+
+#[cfg(test)]
+fn backtrack(
+    decisions: &mut Vec<Decision>,
+    active_columns: &mut [bool; LINKED_TABLE_COLUMNS],
+    table: &mut LinkedTable,
+    decision_strategy: DecisionStrategy,
+) -> (usize, usize, Vec<usize>) {
+    loop {
+        let mut previous_decision = decisions.pop().unwrap_or_else(|| {
+            panic!(
+                "There are no decisions left to undo, but the puzzle still has unsatisfied columns"
+            )
+        });
+
+        reveal_all_columns_in_row(
+            previous_decision.selected_row,
+            previous_decision.selected_column,
+            table,
+        );
+        for &column_idx in &previous_decision.hidden_columns {
+            active_columns[column_idx] = true;
+        }
+
+        if previous_decision.potential_rows.is_empty() {
+            continue;
+        }
+
+        let next_row =
+            pick_row(&mut previous_decision.potential_rows, decision_strategy);
+
+        return (
+            previous_decision.selected_column,
+            next_row,
+            previous_decision.potential_rows,
+        );
+    }
+}
+
+pub fn launch_dancing_links() -> Vec<usize> {
+    let mut linked_table = generate_linked_table();
+    let linked_solution =
+        solve_dancing_links(&mut linked_table, DecisionStrategy::First);
+
+    linked_solution
+        .into_iter()
+        .map(|row_idx| map_linked_row_to_decision_row(&linked_table, row_idx))
+        .collect()
 }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ptr;
 
 use super::*;
@@ -1427,4 +1428,60 @@ fn it_reveals_multiple_hidden_rows_in_reverse_order() {
     reveal_all_columns_in_row(4, 0, &mut linked_table);
 
     assert_crafted_table_eq(&linked_table, &original_table);
+}
+
+#[test]
+fn it_backtracks_by_revealing_previous_decision_state() {
+    let original_table = generate_crafted_hide_all_columns_in_row_table();
+    let mut linked_table = generate_crafted_hide_all_columns_in_row_table();
+    let hidden_columns = hide_all_columns_in_row(2, 0, &mut linked_table);
+
+    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
+    for &column_idx in &hidden_columns {
+        active_columns[column_idx] = false;
+    }
+
+    let mut decisions = vec![Decision {
+        selected_column: 0,
+        selected_row: 2,
+        potential_rows: vec![4],
+        hidden_columns: hidden_columns.clone(),
+    }];
+
+    let (selected_column, selected_row, remaining_rows) = backtrack(
+        &mut decisions,
+        &mut active_columns,
+        &mut linked_table,
+        DecisionStrategy::First,
+    );
+
+    assert_eq!(selected_column, 0);
+    assert_eq!(selected_row, 4);
+    assert!(remaining_rows.is_empty());
+    assert_crafted_table_eq(&linked_table, &original_table);
+    for &column_idx in &hidden_columns {
+        assert!(active_columns[column_idx]);
+    }
+}
+
+#[test]
+fn launch_dancing_links_returns_an_exact_cover_solution() {
+    let decisions = launch_dancing_links();
+    let constraint_table = generate_constraint_table();
+    let unique_decisions: HashSet<_> = decisions.iter().copied().collect();
+
+    assert_eq!(decisions.len(), 81);
+    assert_eq!(unique_decisions.len(), 81);
+
+    for column_idx in 0..LINKED_TABLE_COLUMNS {
+        let cells_in_column = decisions
+            .iter()
+            .filter(|&&row_idx| constraint_table.table[row_idx][column_idx])
+            .count();
+
+        assert_eq!(
+            cells_in_column, 1,
+            "column {column_idx} was not covered exactly once"
+        );
+    }
 }
