@@ -604,39 +604,44 @@ fn reveal_all_columns_in_row(
     }
 }
 
-fn search(
-    table: &mut LinkedTable,
-    decision_strategy: DecisionStrategy,
-) -> Vec<usize> {
+pub fn launch_dancing_links() -> Vec<usize> {
+    let mut linked_table = generate_linked_table();
     let mut active_columns = [true; LINKED_TABLE_COLUMNS];
     let mut solution = vec![];
     let mut decisions: Vec<Decision> = vec![];
 
     loop {
         if active_columns.iter().all(|is_active| !is_active) {
-            return solution;
+            return solution.into_iter().map(|row_idx| row_idx - 1).collect();
         }
 
-        let selected_column =
-            select_column(&active_columns, decision_strategy, table);
+        let selected_column = select_column(
+            &active_columns,
+            DecisionStrategy::First,
+            &linked_table,
+        );
         let mut candidate_rows =
-            match find_satisfying_rows(selected_column, table) {
+            match find_satisfying_rows(selected_column, &linked_table) {
                 Some(rows) => rows,
                 None => {
                     backtrack(
                         &mut decisions,
                         &mut active_columns,
                         &mut solution,
-                        table,
-                        decision_strategy,
+                        &mut linked_table,
+                        DecisionStrategy::First,
                     );
                     continue;
                 }
             };
 
-        let selected_row = pick_row(&mut candidate_rows, decision_strategy);
-        let hidden_columns =
-            hide_all_columns_in_row(selected_row, selected_column, table);
+        let selected_row =
+            pick_row(&mut candidate_rows, DecisionStrategy::First);
+        let hidden_columns = hide_all_columns_in_row(
+            selected_row,
+            selected_column,
+            &mut linked_table,
+        );
         for &column_idx in &hidden_columns {
             active_columns[column_idx] = false;
         }
@@ -696,14 +701,4 @@ fn backtrack(
 
         return;
     }
-}
-
-pub fn launch_dancing_links() -> Vec<usize> {
-    let mut linked_table = generate_linked_table();
-    let linked_solution = search(&mut linked_table, DecisionStrategy::First);
-
-    linked_solution
-        .into_iter()
-        .map(|row_idx| row_idx - 1)
-        .collect()
 }
