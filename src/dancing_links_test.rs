@@ -55,21 +55,23 @@ fn it_can_construct_an_empty_table() {
 #[test]
 fn it_selects_first_column_simple() {
     let lt = LinkedTable::default();
-    let mut cols = vec![4, 5, 6];
-    let selected = select_column(&mut cols, DecisionStrategy::First, &lt);
+    let mut cols = [false; LINKED_TABLE_COLUMNS];
+    cols[4] = true;
+    cols[5] = true;
+    cols[6] = true;
+    let selected = select_column(&cols, DecisionStrategy::First, &lt);
     assert_eq!(selected, 6);
-    assert_eq!(cols, vec![4, 5]);
 }
 
 #[test]
 fn it_selects_random_column_simple() {
     let lt = LinkedTable::default();
-    let mut cols = vec![10, 20, 30];
-    let before = cols.clone();
-    let selected = select_column(&mut cols, DecisionStrategy::Random, &lt);
-    assert_eq!(cols.len(), before.len() - 1);
-    assert!(before.contains(&selected));
-    assert!(!cols.contains(&selected));
+    let mut cols = [false; LINKED_TABLE_COLUMNS];
+    cols[10] = true;
+    cols[20] = true;
+    cols[30] = true;
+    let selected = select_column(&cols, DecisionStrategy::Random, &lt);
+    assert!(selected == 10 || selected == 20 || selected == 30);
 }
 
 #[test]
@@ -83,11 +85,14 @@ fn it_selects_optimal_column() {
     if let Link::ColumnHeader(ch) = &mut linked_table.table[0][8] {
         ch.cell_count = 8;
     }
-    let mut cols = vec![0, 5, 6, 8];
+    let mut cols = [false; LINKED_TABLE_COLUMNS];
+    cols[0] = true;
+    cols[5] = true;
+    cols[6] = true;
+    cols[8] = true;
     let selected =
-        select_column(&mut cols, DecisionStrategy::Optimal, &linked_table);
+        select_column(&cols, DecisionStrategy::Optimal, &linked_table);
     assert!(selected == 5 || selected == 8);
-    assert!(cols == vec![0, 6, 8] || cols == vec![0, 5, 6]);
 }
 
 #[test]
@@ -648,7 +653,7 @@ fn it_finds_all_expected_rows() {
 
     assert_eq!(
         satisfying_rows,
-        Some((87, vec![96, 105, 114, 123, 132, 141, 150, 159]))
+        Some(vec![87, 96, 105, 114, 123, 132, 141, 150, 159])
     );
 }
 
@@ -1431,40 +1436,6 @@ fn it_reveals_multiple_hidden_rows_in_reverse_order() {
 }
 
 #[test]
-fn it_backtracks_by_revealing_previous_decision_state() {
-    let original_table = generate_crafted_hide_all_columns_in_row_table();
-    let mut linked_table = generate_crafted_hide_all_columns_in_row_table();
-    let hidden_columns = hide_all_columns_in_row(2, 0, &mut linked_table);
-
-    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
-    for &column_idx in &hidden_columns {
-        active_columns[column_idx] = false;
-    }
-
-    let mut decisions = vec![Decision {
-        selected_column: 0,
-        selected_row: 2,
-        potential_rows: vec![4],
-        hidden_columns: hidden_columns.clone(),
-    }];
-
-    let (selected_column, selected_row, remaining_rows) = backtrack(
-        &mut decisions,
-        &mut active_columns,
-        &mut linked_table,
-        DecisionStrategy::First,
-    );
-
-    assert_eq!(selected_column, 0);
-    assert_eq!(selected_row, 4);
-    assert!(remaining_rows.is_empty());
-    assert_crafted_table_eq(&linked_table, &original_table);
-    for &column_idx in &hidden_columns {
-        assert!(active_columns[column_idx]);
-    }
-}
-
-#[test]
 fn launch_dancing_links_returns_an_exact_cover_solution() {
     let decisions = launch_dancing_links();
     let constraint_table = generate_constraint_table();
@@ -1483,5 +1454,22 @@ fn launch_dancing_links_returns_an_exact_cover_solution() {
             cells_in_column, 1,
             "column {column_idx} was not covered exactly once"
         );
+    }
+}
+
+#[test]
+fn linked_row_indexes_are_offset_by_column_header_row() {
+    let linked_table = generate_linked_table();
+
+    for linked_row_idx in 1..LINKED_TABLE_ROWS {
+        let row_index = linked_table.table[linked_row_idx]
+            .iter()
+            .find_map(|link| match link {
+                Link::Cell(cell) => Some(cell.row_index),
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(row_index, linked_row_idx - 1);
     }
 }

@@ -40,21 +40,11 @@ struct LinkedTable {
     table: Box<[[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]>,
 }
 /// Strategy to select the next column in Dancing Links search
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DecisionStrategy {
     First,
     Random,
     Optimal,
-}
-
-#[cfg(test)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Decision {
-    selected_column: usize,
-    selected_row: usize,
-    potential_rows: Vec<usize>,
-    hidden_columns: Vec<usize>,
 }
 
 impl Default for LinkedTable {
@@ -276,40 +266,61 @@ fn link_unlinked_table(linked_table: &mut LinkedTable) -> () {
     }
 }
 
-/// Selects a column from the list of potential columns according to the
-/// strategy. Removes the column from the vector and returns it.
+/// Selects an active column according to the requested strategy.
 fn select_column(
-    potential_columns: &mut Vec<usize>,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
     decision_strategy: DecisionStrategy,
     table: &LinkedTable,
 ) -> usize {
-    if potential_columns.is_empty() {
+    if !active_columns.iter().any(|is_active| *is_active) {
         panic!("No columns to select");
     }
+
     match decision_strategy {
-        DecisionStrategy::First => potential_columns.pop().unwrap(),
+        DecisionStrategy::First => active_columns
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(
+                |(column_idx, is_active)| {
+                    if *is_active { Some(column_idx) } else { None }
+                },
+            )
+            .unwrap(),
         DecisionStrategy::Random => {
+            let potential_columns: Vec<usize> =
+                active_columns
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(column_idx, is_active)| {
+                        if *is_active { Some(column_idx) } else { None }
+                    })
+                    .collect();
             let idx = rand::thread_rng().gen_range(0..potential_columns.len());
-            potential_columns.remove(idx)
+            potential_columns[idx]
         }
         DecisionStrategy::Optimal => {
             let mut min_count = i32::MAX;
             let mut min_column_idxs = Vec::new();
-            for (idx, &col) in potential_columns.iter().enumerate() {
+            for (column_idx, is_active) in active_columns.iter().enumerate() {
+                if !is_active {
+                    continue;
+                }
+
+                let col = column_idx;
                 if let Link::ColumnHeader(ch) = table.table[0][col] {
                     let count = ch.cell_count;
                     if count < min_count {
                         min_count = count;
                         min_column_idxs.clear();
-                        min_column_idxs.push(idx);
+                        min_column_idxs.push(col);
                     } else if count == min_count {
-                        min_column_idxs.push(idx);
+                        min_column_idxs.push(col);
                     }
                 }
             }
             let idx = rand::thread_rng().gen_range(0..min_column_idxs.len());
-            let random_potential_columns_idx = min_column_idxs[idx];
-            potential_columns.remove(random_potential_columns_idx)
+            min_column_idxs[idx]
         }
     }
 }
@@ -319,9 +330,9 @@ fn select_column(
 fn find_satisfying_rows(
     selected_column_idx: usize,
     table: &LinkedTable,
-) -> Option<(usize, Vec<usize>)> {
+) -> Option<Vec<usize>> {
     // Literally just go to the ColumnHeader and find down
-    let selected_row = match table.table[0][selected_column_idx] {
+    let mut next_row = match table.table[0][selected_column_idx] {
         Link::ColumnHeader(ch) => match ch.down {
             Some(0) | None => return None,
             Some(row_idx) => row_idx,
@@ -329,24 +340,22 @@ fn find_satisfying_rows(
         _ => panic!(),
     };
 
-    let mut alternate_rows: Vec<usize> = vec![];
-
-    let mut next_row = Some(selected_row);
+    let mut satisfying_rows: Vec<usize> = vec![next_row];
 
     loop {
-        next_row = match table.table[next_row.unwrap()][selected_column_idx] {
-            Link::Cell(c) => c.down,
+        next_row = match table.table[next_row][selected_column_idx] {
+            Link::Cell(c) => c.down.unwrap(),
             _ => panic!(),
         };
 
-        if next_row == Some(0) {
+        if next_row == 0 {
             break;
         }
 
-        alternate_rows.push(next_row.unwrap());
+        satisfying_rows.push(next_row);
     }
 
-    Some((selected_row, alternate_rows))
+    Some(satisfying_rows)
 }
 
 fn pick_row(
@@ -618,27 +627,13 @@ fn search(
         return true;
     }
 
-    let mut unsatisfied_columns: Vec<usize> = active_columns
-        .iter()
-        .enumerate()
-        .filter_map(
-            |(column_idx, is_active)| {
-                if *is_active { Some(column_idx) } else { None }
-            },
-        )
-        .collect();
-
     let selected_column =
-        select_column(&mut unsatisfied_columns, decision_strategy, table);
-
-    let (selected_row, alternate_rows) =
-        match find_satisfying_rows(selected_column, table) {
-            Some(rows) => rows,
-            None => return false,
-        };
-
-    let mut candidate_rows = vec![selected_row];
-    candidate_rows.extend(alternate_rows);
+        select_column(active_columns, decision_strategy, table);
+    let mut candidate_rows = match find_satisfying_rows(selected_column, table)
+    {
+        Some(rows) => rows,
+        None => return false,
+    };
 
     while !candidate_rows.is_empty() {
         let selected_row = pick_row(&mut candidate_rows, decision_strategy);
@@ -663,61 +658,6 @@ fn search(
     false
 }
 
-fn map_linked_row_to_decision_row(
-    table: &LinkedTable,
-    linked_row_idx: usize,
-) -> usize {
-    table.table[linked_row_idx]
-        .iter()
-        .find_map(|link| match link {
-            Link::Cell(cell) => Some(cell.row_index),
-            _ => None,
-        })
-        .unwrap_or_else(|| {
-            panic!(
-                "linked row {linked_row_idx} did not contain a decision cell"
-            )
-        })
-}
-
-#[cfg(test)]
-fn backtrack(
-    decisions: &mut Vec<Decision>,
-    active_columns: &mut [bool; LINKED_TABLE_COLUMNS],
-    table: &mut LinkedTable,
-    decision_strategy: DecisionStrategy,
-) -> (usize, usize, Vec<usize>) {
-    loop {
-        let mut previous_decision = decisions.pop().unwrap_or_else(|| {
-            panic!(
-                "There are no decisions left to undo, but the puzzle still has unsatisfied columns"
-            )
-        });
-
-        reveal_all_columns_in_row(
-            previous_decision.selected_row,
-            previous_decision.selected_column,
-            table,
-        );
-        for &column_idx in &previous_decision.hidden_columns {
-            active_columns[column_idx] = true;
-        }
-
-        if previous_decision.potential_rows.is_empty() {
-            continue;
-        }
-
-        let next_row =
-            pick_row(&mut previous_decision.potential_rows, decision_strategy);
-
-        return (
-            previous_decision.selected_column,
-            next_row,
-            previous_decision.potential_rows,
-        );
-    }
-}
-
 pub fn launch_dancing_links() -> Vec<usize> {
     let mut linked_table = generate_linked_table();
     let linked_solution =
@@ -725,6 +665,6 @@ pub fn launch_dancing_links() -> Vec<usize> {
 
     linked_solution
         .into_iter()
-        .map(|row_idx| map_linked_row_to_decision_row(&linked_table, row_idx))
+        .map(|row_idx| row_idx - 1)
         .collect()
 }
