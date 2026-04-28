@@ -60,7 +60,7 @@ fn it_selects_first_column_simple() {
     cols[5] = true;
     cols[6] = true;
     let selected = select_column(&cols, DecisionStrategy::First, &lt);
-    assert_eq!(selected, 6);
+    assert_eq!(selected, 4);
 }
 
 #[test]

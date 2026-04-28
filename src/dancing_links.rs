@@ -280,7 +280,6 @@ fn select_column(
         DecisionStrategy::First => active_columns
             .iter()
             .enumerate()
-            .rev()
             .find_map(
                 |(column_idx, is_active)| {
                     if *is_active { Some(column_idx) } else { None }
@@ -325,8 +324,6 @@ fn select_column(
     }
 }
 
-// TODO: Implement decision strategies for this as well. The program will work
-// fine without this so it is very low priority.
 fn find_satisfying_rows(
     selected_column_idx: usize,
     table: &LinkedTable,
@@ -358,6 +355,8 @@ fn find_satisfying_rows(
     Some(satisfying_rows)
 }
 
+// TODO: Implement decision strategies for this as well. The program will work
+// fine without this so it is very low priority.
 fn pick_row(
     potential_rows: &mut Vec<usize>,
     decision_strategy: DecisionStrategy,
@@ -600,23 +599,6 @@ fn reveal_all_columns_in_row(
     }
 }
 
-fn solve_dancing_links(
-    table: &mut LinkedTable,
-    decision_strategy: DecisionStrategy,
-) -> Vec<usize> {
-    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
-    let mut solution = vec![];
-
-    let was_solved =
-        search(table, &mut active_columns, &mut solution, decision_strategy);
-
-    if !was_solved {
-        panic!("Dancing Links search could not find a valid solution");
-    }
-
-    solution
-}
-
 fn search(
     table: &mut LinkedTable,
     active_columns: &mut [bool; LINKED_TABLE_COLUMNS],
@@ -660,8 +642,19 @@ fn search(
 
 pub fn launch_dancing_links() -> Vec<usize> {
     let mut linked_table = generate_linked_table();
-    let linked_solution =
-        solve_dancing_links(&mut linked_table, DecisionStrategy::First);
+    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
+    let mut linked_solution = vec![];
+
+    let was_solved = search(
+        &mut linked_table,
+        &mut active_columns,
+        &mut linked_solution,
+        DecisionStrategy::First,
+    );
+
+    if !was_solved {
+        panic!("Dancing Links search could not find a valid solution");
+    }
 
     linked_solution
         .into_iter()
