@@ -3,6 +3,10 @@
 # The first argument is the PR title, the second is optional, and if
 # passed is used as the PR body.
 set -euo pipefail
+if [ $# -eq 0 ]; then
+  echo "Usage $0 <PR-title> [PR-body]"
+  exit 1
+fi
 
 title="$1"
 body="${2:-}"
