@@ -5,11 +5,11 @@ The most efficent sudoku solving algorithm Dancing Links.
 ### Performance
 
 
-| Algorithm           | Boards Tested | Avg. Time (10 runs) | Time per Board      |
-|---------------------|---------------|---------------------|---------------------|
-| Dancing Links       | 100,000       | 10.703776529 s      | **0.10703776 ms**   |
-| Depth First Search  | 100,000       | 37.43318 s          | **0.3743318 ms**    |
-| Algorithm X         | 100           | 25.280457503 s      | **252.80457503 ms** |
+| Algorithm           |  Time per Board     |
+|---------------------|---------------------|
+| Dancing Links       | **0.107 ms**        |
+| Depth First Search  | **0.374 ms**        |
+| Algorithm X         | **253 ms**          |
 
 ### The Algorithm
 
