@@ -1437,7 +1437,11 @@ fn it_reveals_multiple_hidden_rows_in_reverse_order() {
 
 #[test]
 fn launch_dancing_links_returns_an_exact_cover_solution() {
-    let decisions = launch_dancing_links();
+    let decisions = launch_dancing_links(
+        1,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
+    )[0];
     let constraint_table = generate_constraint_table();
     let unique_decisions: HashSet<_> = decisions.iter().copied().collect();
 
@@ -1473,3 +1477,28 @@ fn linked_row_indexes_are_offset_by_column_header_row() {
         assert_eq!(row_index, linked_row_idx - 1);
     }
 }
+
+// #[test]
+// fn dance_bench() {
+//     const RUNS: usize = 10;
+
+//     let mut total = Duration::ZERO;
+
+//     for i in 0..RUNS {
+//         let start = Instant::now();
+//         let _solutions = advanced_get_sudoku_boards(
+//             100000,
+//             DecisionStrategy::Optimal,
+//             DecisionStrategy::Optimal,
+//         );
+//         let elapsed = start.elapsed();
+
+//         println!("Run {} took {:?}", i + 1, elapsed);
+//         total += elapsed;
+//     }
+
+//     let average = total / RUNS as u32;
+//     println!("\nAverage runtime over {} runs: {:?}", RUNS, average);
+
+//     assert!(false);
+// }

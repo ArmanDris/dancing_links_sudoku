@@ -1,7 +1,11 @@
 use rand::Rng;
-use std::array;
+use std::{array, collections::HashSet};
 
-use crate::algorithm_x::{ConstraintTable, generate_constraint_table};
+use crate::Board;
+
+use crate::algorithm_x::{
+    ConstraintTable, generate_constraint_table, map_solution_set_to_board,
+};
 
 #[cfg(test)]
 #[path = "dancing_links_test.rs"]
@@ -41,7 +45,7 @@ struct LinkedTable {
 }
 /// Strategy to select the next column in Dancing Links search
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum DecisionStrategy {
+pub enum DecisionStrategy {
     First,
     Random,
     Optimal,
@@ -604,63 +608,12 @@ fn reveal_all_columns_in_row(
     }
 }
 
-pub fn launch_dancing_links() -> Vec<usize> {
-    let mut linked_table = generate_linked_table();
-    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
-    let mut solution = vec![];
-    let mut decisions: Vec<Decision> = vec![];
-
-    loop {
-        if active_columns.iter().all(|is_active| !is_active) {
-            return solution.into_iter().map(|row_idx| row_idx - 1).collect();
-        }
-
-        let selected_column = select_column(
-            &active_columns,
-            DecisionStrategy::First,
-            &linked_table,
-        );
-        let mut candidate_rows =
-            match find_satisfying_rows(selected_column, &linked_table) {
-                Some(rows) => rows,
-                None => {
-                    backtrack(
-                        &mut decisions,
-                        &mut active_columns,
-                        &mut solution,
-                        &mut linked_table,
-                        DecisionStrategy::First,
-                    );
-                    continue;
-                }
-            };
-
-        let selected_row =
-            pick_row(&mut candidate_rows, DecisionStrategy::First);
-        let hidden_columns = hide_all_columns_in_row(
-            selected_row,
-            selected_column,
-            &mut linked_table,
-        );
-        for &column_idx in &hidden_columns {
-            active_columns[column_idx] = false;
-        }
-        solution.push(selected_row);
-        decisions.push(Decision {
-            selected_column,
-            selected_row,
-            potential_rows: candidate_rows,
-            hidden_columns,
-        });
-    }
-}
-
 fn backtrack(
     decisions: &mut Vec<Decision>,
     active_columns: &mut [bool; LINKED_TABLE_COLUMNS],
     solution: &mut Vec<usize>,
     table: &mut LinkedTable,
-    decision_strategy: DecisionStrategy,
+    row_decision_strategy: DecisionStrategy,
 ) {
     loop {
         let mut previous_decision = decisions.pop().unwrap_or_else(|| {
@@ -681,8 +634,10 @@ fn backtrack(
             continue;
         }
 
-        let next_row =
-            pick_row(&mut previous_decision.potential_rows, decision_strategy);
+        let next_row = pick_row(
+            &mut previous_decision.potential_rows,
+            row_decision_strategy,
+        );
         let hidden_columns = hide_all_columns_in_row(
             next_row,
             previous_decision.selected_column,
@@ -701,4 +656,101 @@ fn backtrack(
 
         return;
     }
+}
+
+fn launch_dancing_links(
+    num_solutions: i32,
+    column_decision_strategy: DecisionStrategy,
+    row_decision_strategy: DecisionStrategy,
+) -> Vec<[usize; 81]> {
+    let mut solutions: Vec<[usize; 81]> =
+        Vec::with_capacity(num_solutions as usize);
+    let mut linked_table = generate_linked_table();
+    // TODO - Figure out if this would be better as a vector
+    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
+    let mut solution = Vec::with_capacity(81);
+    let mut decisions: Vec<Decision> = Vec::with_capacity(81);
+
+    loop {
+        if active_columns.iter().all(|is_active| !is_active) {
+            solutions
+                .push(std::array::from_fn::<_, 81, _>(|i| solution[i] - 1));
+            backtrack(
+                &mut decisions,
+                &mut active_columns,
+                &mut solution,
+                &mut linked_table,
+                row_decision_strategy,
+            );
+        }
+
+        if solutions.len() >= num_solutions as usize {
+            break;
+        }
+
+        let selected_column = select_column(
+            &active_columns,
+            column_decision_strategy,
+            &linked_table,
+        );
+        let mut candidate_rows =
+            match find_satisfying_rows(selected_column, &linked_table) {
+                Some(rows) => rows,
+                None => {
+                    backtrack(
+                        &mut decisions,
+                        &mut active_columns,
+                        &mut solution,
+                        &mut linked_table,
+                        DecisionStrategy::First,
+                    );
+                    continue;
+                }
+            };
+
+        let selected_row = pick_row(&mut candidate_rows, row_decision_strategy);
+        let hidden_columns = hide_all_columns_in_row(
+            selected_row,
+            selected_column,
+            &mut linked_table,
+        );
+        for &column_idx in &hidden_columns {
+            active_columns[column_idx] = false;
+        }
+        solution.push(selected_row);
+        decisions.push(Decision {
+            selected_column,
+            selected_row,
+            potential_rows: candidate_rows,
+            hidden_columns,
+        });
+    }
+
+    solutions
+}
+
+pub fn advanced_get_sudoku_boards(
+    num_solutions: i32,
+    column_decision_strategy: DecisionStrategy,
+    row_decision_strategy: DecisionStrategy,
+) -> Vec<Board> {
+    launch_dancing_links(
+        num_solutions,
+        column_decision_strategy,
+        row_decision_strategy,
+    )
+    .into_iter()
+    .map(|solution_set| map_solution_set_to_board(&HashSet::from(solution_set)))
+    .collect()
+}
+
+pub fn get_sudoku_boards(num_solutions: i32) -> Vec<Board> {
+    launch_dancing_links(
+        num_solutions,
+        DecisionStrategy::Optimal,
+        DecisionStrategy::Random,
+    )
+    .into_iter()
+    .map(|solution_set| map_solution_set_to_board(&HashSet::from(solution_set)))
+    .collect()
 }

@@ -938,22 +938,22 @@ fn returns_unique_solutions_when_many_are_requested() {
 
 // // Below will run 10 benchmarks
 // #[test]
-// fn test_arm() {
-//   const RUNS: usize = 10;
+// fn alg_x_bench() {
+//     const RUNS: usize = 10;
 
-//   let mut total = Duration::ZERO;
+//     let mut total = Duration::ZERO;
 
-//   for i in 0..RUNS {
-//     let start = Instant::now();
-//     let _solutions = launch_algorithm_x(None, None, Some(100));
-//     let elapsed = start.elapsed();
+//     for i in 0..RUNS {
+//         let start = Instant::now();
+//         let _solutions = launch_algorithm_x(None, None, Some(1000));
+//         let elapsed = start.elapsed();
 
-//     println!("Run {} took {:?}", i + 1, elapsed);
-//     total += elapsed;
-//   }
+//         println!("Run {} took {:?}", i + 1, elapsed);
+//         total += elapsed;
+//     }
 
-//   let average = total / RUNS as u32;
-//   println!("\nAverage runtime over {} runs: {:?}", RUNS, average);
+//     let average = total / RUNS as u32;
+//     println!("\nAverage runtime over {} runs: {:?}", RUNS, average);
 
-//   assert!(false);
+//     assert!(false);
 // }
