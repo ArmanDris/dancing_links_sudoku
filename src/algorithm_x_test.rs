@@ -914,6 +914,28 @@ fn test_algorithm_x() {
     assert_eq!(zero_exists, false);
 }
 
+#[test]
+fn returns_unique_solutions_when_many_are_requested() {
+    let solutions =
+        launch_algorithm_x(None, Some(DecisionStrategy::First), Some(10));
+
+    let signatures: HashSet<Vec<i32>> = solutions
+        .iter()
+        .map(|board| {
+            let mut cells = Vec::with_capacity(81);
+            for row_idx in 0..9 {
+                for &cell in board.get_row(row_idx) {
+                    cells.push(cell);
+                }
+            }
+            cells
+        })
+        .collect();
+
+    assert_eq!(solutions.len(), 10);
+    assert_eq!(signatures.len(), 10);
+}
+
 // // Below will run 10 benchmarks
 // #[test]
 // fn test_arm() {

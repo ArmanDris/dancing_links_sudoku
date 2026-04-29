@@ -1,5 +1,4 @@
 use crate::board::Board;
-use core::panic;
 use rand::Rng;
 use std::collections::HashSet;
 
@@ -367,7 +366,7 @@ fn backtrack(
     pick_row(popped_decision.potential_rows, decision_strategy)
 }
 
-fn map_solution_set_to_board(solution_set: &HashSet<usize>) -> Board {
+pub fn map_solution_set_to_board(solution_set: &HashSet<usize>) -> Board {
     // every cell occupies 9 entries inthe table
     // to get the value from an index do: (index % 9) + 1
     // to get the coordinates from an index do (index / 9) = x, where the row = x/9 and the column = x%9
@@ -432,7 +431,6 @@ fn generate_initial_state(
     (initial_solution_set, initial_hidden_rows)
 }
 
-// TODO: Create public facing functions that clearly
 // seperate generating a single board with default params
 // vs fine tuning and generating a vector of board
 pub fn launch_algorithm_x(
@@ -470,11 +468,9 @@ pub fn launch_algorithm_x(
     let mut decisions: Vec<Decision> = vec![];
 
     loop {
-        // Step 1: Pick an unsatisifed constraint
-        let unsatisfied_column_idx =
+        let (selected_row, possible_rows): (usize, Vec<usize>) =
             match find_unsatisfied_constraint(&constraint_table, &solution_set)
             {
-                Some(index) => index,
                 None => {
                     solutions.push(map_solution_set_to_board(&solution_set));
                     if solutions.len() >= desired_solutions {
@@ -485,46 +481,42 @@ pub fn launch_algorithm_x(
                         &mut hidden_rows,
                         &mut solution_set,
                         decision_strategy,
-                    );
-                    find_unsatisfied_constraint(
-                        &constraint_table,
-                        &solution_set,
                     )
-                    .unwrap()
+                }
+                Some(unsatisfied_column_idx) => {
+                    // Step 2: Get all the rows we can pick to satisfy the constraint
+                    // If satisfying rows is empty:
+                    //   1. Pop the last decision. If the popped decision has no
+                    //      potential_rows we can select, pop another. If we pop
+                    //      all decisions without finding another potential row
+                    //      we could have selected. Hard fail, the board is
+                    //      unsolvable.
+                    //   2. Iterate through all popped decisions, remove the
+                    //      selected row from the solution set, and hidden set.
+                    //      Also remove each decision's conflicting rows from the
+                    //      hidden rows set.
+                    //   3. Select the next potential row from the popped decision
+                    //   4. Calculate all the conflicting rows from the newly picked row
+                    //      and return those two values as the tuple
+                    //      (selected_row, possible_rows) to be turned into the next
+                    //      decision. (possible rows is the calculated conflicting rows)
+                    let satisfying_rows = find_satisfying_rows(
+                        &constraint_table,
+                        &hidden_rows,
+                        unsatisfied_column_idx,
+                    );
+
+                    match satisfying_rows.is_empty() {
+                        false => pick_row(satisfying_rows, decision_strategy),
+                        true => backtrack(
+                            &mut decisions,
+                            &mut hidden_rows,
+                            &mut solution_set,
+                            decision_strategy,
+                        ),
+                    }
                 }
             };
-
-        // Step 2: Get all the rows we can pick to satisfy the constraint
-        // If satisfying rows is empty:
-        //   1. Pop the last decision. If the popped decision has no
-        //      potential_rows we can select, pop another. If we pop
-        //      all decisions without finding another potential row
-        //      we could have selected. Hard fail, the board is
-        //      unsolvable.
-        //   2. Iterate through all popped decisions, remove the
-        //      selected row from the solution set, and hidden set.
-        //      Also remove each decision's conflicting rows from the
-        //      hidden rows set.
-        //   3. Select the next potential row from the popped decision
-        //   4. Calculate all the conflicting rows from the newly picked row
-        //      and return those two values as the tuple
-        //      (selected_row, possible_rows) to be turned into the next
-        //      decision. (possible rows is the calculated conflicting rows)
-        let satisfying_rows = find_satisfying_rows(
-            &constraint_table,
-            &hidden_rows,
-            unsatisfied_column_idx,
-        );
-
-        let (selected_row, possible_rows) = match satisfying_rows.is_empty() {
-            false => pick_row(satisfying_rows, decision_strategy),
-            true => backtrack(
-                &mut decisions,
-                &mut hidden_rows,
-                &mut solution_set,
-                decision_strategy,
-            ),
-        };
 
         // Step 3: Add the row to the solution set
         solution_set.insert(selected_row);
