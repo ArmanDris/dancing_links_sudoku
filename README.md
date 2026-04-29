@@ -1,6 +1,7 @@
 # Dancing Links Sudoku
 
-The most efficent sudoku solving algorithm Dancing Links.
+A Rust implementation of the most efficent sudoku solving algorithm: Dancing
+Links.
 
 ### Performance
 
@@ -25,6 +26,7 @@ table. Each `1` in the matrix contains a pointer to the nearest
 `left`/`right`/`up`/`down` `1` value.
 
 For example:
+
 ![Dancing links doubly linked circular matrix](https://web.archive.org/web/20230426084731im_/https://garethrees.org/2007/06/10/zendoku-generation/dancing-links-1.png)
 
 Dancing links efficiently finds a solution by rewiring the pointers to hide
@@ -32,6 +34,7 @@ columns and cells that could not contribute to our solution, shrinking the
 problem space as it runs. 
 
 Pointers after covering the first column:
+
 ![Dancing links table after the first column is hidden](https://web.archive.org/web/20230426084731im_/https://garethrees.org/2007/06/10/zendoku-generation/dancing-links-2.png)
 
 Just as importantly, dancing links is able to backtrack from dead ends by
