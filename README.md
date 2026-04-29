@@ -21,7 +21,8 @@ This article was instrumental in teaching me how to perform the reduction:
 
 Once you have the exact cover matrix, you need to turn it into a doubly linked
 table. Each `1` in the matrix contains a pointer to the nearest 
-`left`/`right`/`up`/`down` `1` value.
+`left`/`right`/`up`/`down` `1` value. The pointers may wrap around to the other
+side of the table.
 
 For example:
 
