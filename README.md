@@ -14,12 +14,10 @@ Links.
 
 ### The Algorithm
 
-Dancing Links requires reducing the problem to and from an [exact cover problem]
-(https://en.wikipedia.org/wiki/Exact_cover#Incidence_matrix).
+Dancing Links requires reducing the problem to and from an [exact cover problem](https://en.wikipedia.org/wiki/Exact_cover#Incidence_matrix).
 
 This article was instrumental in teaching me how to perform the reduction: 
-[https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/]
-(https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/).
+[https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/](https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/).
 
 Once you have the exact cover matrix, you need to turn it into a doubly linked
 table. Each `1` in the matrix contains a pointer to the nearest 
@@ -43,12 +41,10 @@ revealing previously hidden columns and cells using only a few pointer updates.
 To understand the low level mechanics of this algorithm you will need to read
 the afformentioned amazing article: 
 
-[https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/]
-(https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/).
+[https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/](https://web.archive.org/web/20230426084731/https://garethrees.org/2007/06/10/zendoku-generation/).
 
 and also Donald Knuths Paper to support it (Particularly the very first section
 as well as the section with images showing dancing link table pointer updates):
-[https://www.ocf.berkeley.edu/~jchu/publicportal/sudoku/0011047.pdf]
-(https://www.ocf.berkeley.edu/~jchu/publicportal/sudoku/0011047.pdf)
+[https://www.ocf.berkeley.edu/~jchu/publicportal/sudoku/0011047.pdf](https://www.ocf.berkeley.edu/~jchu/publicportal/sudoku/0011047.pdf)
 
 
