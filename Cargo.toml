@@ -10,6 +10,7 @@ keywords = ["sudoku", "dancing_links", "algorithm_x", "exact_cover"]
 categories = ["algorithms"]
 
 [dependencies]
+plotters = { version = "0.3.7", default-features = false, features = ["svg_backend"] }
 rand = "0.8"
 getrandom = { version = "0.2", optional=true }
 

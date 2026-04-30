@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::ptr;
+use std::{collections::HashSet, fs};
 
 use super::*;
 use crate::algorithm_x::generate_constraint_table;
@@ -1476,6 +1476,35 @@ fn linked_row_indexes_are_offset_by_column_header_row() {
 
         assert_eq!(row_index, linked_row_idx - 1);
     }
+}
+
+#[test]
+fn it_renders_visualization_frames() {
+    let output_dir = std::env::temp_dir().join(format!(
+        "dancing_links_visualization_test_{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&output_dir);
+
+    let result = visualize_dancing_links_search(
+        1,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
+        DancingLinksVisualizationConfig {
+            output_dir: output_dir.clone(),
+            max_frames: Some(3),
+            ..DancingLinksVisualizationConfig::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.solutions.len(), 1);
+    assert_eq!(result.frames.len(), 3);
+    for frame in &result.frames {
+        assert!(frame.exists(), "missing frame {}", frame.display());
+    }
+
+    fs::remove_dir_all(output_dir).unwrap();
 }
 
 // #[test]

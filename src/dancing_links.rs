@@ -1,5 +1,12 @@
+use plotters::prelude::*;
 use rand::Rng;
-use std::{array, collections::HashSet};
+use std::{
+    array,
+    collections::HashSet,
+    error::Error,
+    fmt, fs,
+    path::{Path as StdPath, PathBuf},
+};
 
 use crate::Board;
 
@@ -56,6 +63,78 @@ struct Decision {
     selected_row: usize,
     potential_rows: Vec<usize>,
     hidden_columns: Vec<usize>,
+}
+
+#[derive(Clone, Debug)]
+pub struct DancingLinksVisualizationConfig {
+    pub output_dir: PathBuf,
+    pub max_frames: Option<usize>,
+    pub cell_size: u32,
+    pub cell_gap: u32,
+    pub include_hidden_cells: bool,
+}
+
+impl DancingLinksVisualizationConfig {
+    pub fn new(output_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            output_dir: output_dir.into(),
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for DancingLinksVisualizationConfig {
+    fn default() -> Self {
+        Self {
+            output_dir: PathBuf::from("dancing_links_frames"),
+            max_frames: None,
+            cell_size: 14,
+            cell_gap: 8,
+            include_hidden_cells: true,
+        }
+    }
+}
+
+pub struct DancingLinksVisualizationResult {
+    pub frames: Vec<PathBuf>,
+    pub solutions: Vec<Board>,
+}
+
+#[derive(Debug)]
+pub enum DancingLinksVisualizationError {
+    Io(std::io::Error),
+    Render(String),
+}
+
+impl fmt::Display for DancingLinksVisualizationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(err) => write!(f, "io error: {err}"),
+            Self::Render(err) => write!(f, "render error: {err}"),
+        }
+    }
+}
+
+impl Error for DancingLinksVisualizationError {}
+
+impl From<std::io::Error> for DancingLinksVisualizationError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+struct VisualizationTracer {
+    config: DancingLinksVisualizationConfig,
+    frame_paths: Vec<PathBuf>,
+    frame_index: usize,
+}
+
+#[derive(Clone)]
+struct FrameContext {
+    label: String,
+    highlighted_column: Option<usize>,
+    highlighted_row: Option<usize>,
+    active_solution_rows: Vec<usize>,
 }
 
 impl Default for LinkedTable {
@@ -558,6 +637,606 @@ fn generate_linked_table() -> LinkedTable {
     table
 }
 
+impl VisualizationTracer {
+    fn new(
+        config: DancingLinksVisualizationConfig,
+    ) -> Result<Self, DancingLinksVisualizationError> {
+        fs::create_dir_all(&config.output_dir)?;
+        Ok(Self {
+            config,
+            frame_paths: Vec::new(),
+            frame_index: 0,
+        })
+    }
+
+    fn trace(
+        &mut self,
+        table: &LinkedTable,
+        active_columns: &[bool; LINKED_TABLE_COLUMNS],
+        context: FrameContext,
+    ) -> Result<(), DancingLinksVisualizationError> {
+        if let Some(limit) = self.config.max_frames {
+            if self.frame_index >= limit {
+                return Ok(());
+            }
+        }
+
+        let file_name = format!(
+            "frame_{:04}_{}.svg",
+            self.frame_index,
+            sanitize_label(&context.label)
+        );
+        let frame_path = self.config.output_dir.join(file_name);
+        render_table_frame(
+            &frame_path,
+            table,
+            active_columns,
+            &context,
+            &self.config,
+        )?;
+        self.frame_paths.push(frame_path);
+        self.frame_index += 1;
+        Ok(())
+    }
+}
+
+fn sanitize_label(label: &str) -> String {
+    let sanitized: String = label
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    sanitized.trim_matches('_').to_string()
+}
+
+fn render_table_frame(
+    path: &StdPath,
+    table: &LinkedTable,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+    context: &FrameContext,
+    config: &DancingLinksVisualizationConfig,
+) -> Result<(), DancingLinksVisualizationError> {
+    let cell_size = config.cell_size as i32;
+    let cell_gap = config.cell_gap as i32;
+    let pitch = cell_size + cell_gap;
+    let left_margin = 80i32;
+    let top_margin = 100i32;
+    let right_margin = 80i32;
+    let bottom_margin = 80i32;
+    let width = (left_margin
+        + right_margin
+        + (LINKED_TABLE_COLUMNS as i32 * pitch)) as u32;
+    let height = (top_margin
+        + bottom_margin
+        + (LINKED_TABLE_ROWS as i32 * pitch)) as u32;
+
+    let backend = SVGBackend::new(path, (width, height));
+    let drawing_area = backend.into_drawing_area();
+    drawing_area.fill(&WHITE).map_err(|err| {
+        DancingLinksVisualizationError::Render(err.to_string())
+    })?;
+
+    let active_cells = find_active_cells(table, active_columns);
+
+    draw_frame_annotations(
+        &drawing_area,
+        width,
+        context,
+        left_margin,
+        top_margin,
+    )?;
+    draw_pointer_lines(
+        &drawing_area,
+        table,
+        active_columns,
+        &active_cells,
+        left_margin,
+        top_margin,
+        pitch,
+        cell_size,
+    )?;
+    draw_nodes(
+        &drawing_area,
+        table,
+        active_columns,
+        &active_cells,
+        context,
+        config,
+        left_margin,
+        top_margin,
+        pitch,
+        cell_size,
+    )?;
+
+    drawing_area
+        .present()
+        .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
+}
+
+fn draw_frame_annotations(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    width: u32,
+    context: &FrameContext,
+    left_margin: i32,
+    _top_margin: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    drawing_area
+        .draw(&Text::new(
+            format!("Step: {}", context.label),
+            (left_margin, 28),
+            ("sans-serif", 24).into_font(),
+        ))
+        .map_err(|err| {
+            DancingLinksVisualizationError::Render(err.to_string())
+        })?;
+
+    let active_rows = if context.active_solution_rows.is_empty() {
+        "[]".to_string()
+    } else {
+        format!("{:?}", context.active_solution_rows)
+    };
+    drawing_area
+        .draw(&Text::new(
+            format!(
+                "Solution rows: {active_rows} | Right blue | Left orange | Down red | Up green"
+            ),
+            (left_margin, 58),
+            ("sans-serif", 18).into_font(),
+        ))
+        .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))?;
+
+    drawing_area
+        .draw(&PathElement::new(
+            vec![(left_margin, 72), (width as i32 - left_margin, 72)],
+            BLACK.mix(0.4),
+        ))
+        .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
+}
+
+fn draw_pointer_lines(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    table: &LinkedTable,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+    active_cells: &HashSet<(usize, usize)>,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    cell_size: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    for column_idx in 0..LINKED_TABLE_COLUMNS {
+        if !active_columns[column_idx] {
+            continue;
+        }
+
+        draw_header_pointer_lines(
+            drawing_area,
+            table,
+            column_idx,
+            active_columns,
+            left_margin,
+            top_margin,
+            pitch,
+            cell_size,
+        )?;
+    }
+
+    for &(row_idx, column_idx) in active_cells {
+        draw_cell_pointer_lines(
+            drawing_area,
+            table,
+            row_idx,
+            column_idx,
+            active_columns,
+            active_cells,
+            left_margin,
+            top_margin,
+            pitch,
+            cell_size,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn draw_header_pointer_lines(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    table: &LinkedTable,
+    column_idx: usize,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    cell_size: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    let Link::ColumnHeader(header) = table.table[0][column_idx] else {
+        return Ok(());
+    };
+    let start =
+        node_center(0, column_idx, left_margin, top_margin, pitch, cell_size);
+
+    if let Some(target_column) = header.right.filter(|col| active_columns[*col])
+    {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                0,
+                target_column,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &BLUE.mix(0.5),
+        )?;
+    }
+    if let Some(target_column) = header.left.filter(|col| active_columns[*col])
+    {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                0,
+                target_column,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &RGBColor(222, 140, 74).mix(0.5),
+        )?;
+    }
+    if let Some(target_row) = header.down.filter(|row| *row != 0) {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                0.max(target_row),
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &RED.mix(0.35),
+        )?;
+    }
+    if let Some(target_row) = header.up.filter(|row| *row != 0) {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                target_row,
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &GREEN.mix(0.35),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn draw_cell_pointer_lines(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    table: &LinkedTable,
+    row_idx: usize,
+    column_idx: usize,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+    active_cells: &HashSet<(usize, usize)>,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    cell_size: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    let Link::Cell(cell) = table.table[row_idx][column_idx] else {
+        return Ok(());
+    };
+    let start = node_center(
+        row_idx,
+        column_idx,
+        left_margin,
+        top_margin,
+        pitch,
+        cell_size,
+    );
+
+    if let Some(target_column) = cell.right.filter(|target_column| {
+        active_cells.contains(&(row_idx, *target_column))
+    }) {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                row_idx,
+                target_column,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &BLUE.mix(0.35),
+        )?;
+    }
+    if let Some(target_column) = cell.left.filter(|target_column| {
+        active_cells.contains(&(row_idx, *target_column))
+    }) {
+        draw_colored_line(
+            drawing_area,
+            start,
+            node_center(
+                row_idx,
+                target_column,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            ),
+            &RGBColor(222, 140, 74).mix(0.35),
+        )?;
+    }
+    if let Some(target_row) = cell.up.filter(|target_row| {
+        *target_row == 0
+            || (active_columns[column_idx]
+                && active_cells.contains(&(*target_row, column_idx)))
+    }) {
+        let end = if target_row == 0 {
+            node_center(
+                0,
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            )
+        } else {
+            node_center(
+                target_row,
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            )
+        };
+        draw_colored_line(drawing_area, start, end, &GREEN.mix(0.35))?;
+    }
+    if let Some(target_row) = cell.down.filter(|target_row| {
+        *target_row == 0
+            || (active_columns[column_idx]
+                && active_cells.contains(&(*target_row, column_idx)))
+    }) {
+        let end = if target_row == 0 {
+            node_center(
+                0,
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            )
+        } else {
+            node_center(
+                target_row,
+                column_idx,
+                left_margin,
+                top_margin,
+                pitch,
+                cell_size,
+            )
+        };
+        draw_colored_line(drawing_area, start, end, &RED.mix(0.35))?;
+    }
+
+    Ok(())
+}
+
+fn draw_colored_line<C: Color>(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    start: (i32, i32),
+    end: (i32, i32),
+    color: &C,
+) -> Result<(), DancingLinksVisualizationError> {
+    drawing_area
+        .draw(&PathElement::new(
+            vec![start, end],
+            ShapeStyle::from(color).stroke_width(1),
+        ))
+        .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
+}
+
+fn draw_nodes(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    table: &LinkedTable,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+    active_cells: &HashSet<(usize, usize)>,
+    context: &FrameContext,
+    config: &DancingLinksVisualizationConfig,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    cell_size: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    for column_idx in 0..LINKED_TABLE_COLUMNS {
+        let is_active = active_columns[column_idx];
+        draw_node_square(
+            drawing_area,
+            0,
+            column_idx,
+            cell_size,
+            left_margin,
+            top_margin,
+            pitch,
+            if is_active {
+                if context.highlighted_column == Some(column_idx) {
+                    RGBColor(255, 224, 128)
+                } else {
+                    RGBColor(188, 216, 255)
+                }
+            } else {
+                RGBColor(215, 215, 215)
+            },
+            if is_active {
+                &BLACK
+            } else {
+                &RGBColor(140, 140, 140)
+            },
+        )?;
+
+        if let Link::ColumnHeader(header) = table.table[0][column_idx] {
+            let label_position =
+                node_origin(0, column_idx, left_margin, top_margin, pitch);
+            drawing_area
+                .draw(&Text::new(
+                    format!("{column_idx}:{}", header.cell_count),
+                    (label_position.0, label_position.1 - 4),
+                    ("sans-serif", 8).into_font(),
+                ))
+                .map_err(|err| {
+                    DancingLinksVisualizationError::Render(err.to_string())
+                })?;
+        }
+    }
+
+    for row_idx in 1..LINKED_TABLE_ROWS {
+        for column_idx in 0..LINKED_TABLE_COLUMNS {
+            let Link::Cell(_) = table.table[row_idx][column_idx] else {
+                continue;
+            };
+
+            let is_active = active_cells.contains(&(row_idx, column_idx));
+            if !is_active && !config.include_hidden_cells {
+                continue;
+            }
+
+            let fill = if is_active {
+                if context.highlighted_row == Some(row_idx) {
+                    RGBColor(255, 226, 170)
+                } else if context.highlighted_column == Some(column_idx) {
+                    RGBColor(220, 235, 255)
+                } else {
+                    WHITE
+                }
+            } else {
+                RGBColor(235, 235, 235)
+            };
+            let border = if is_active {
+                &BLACK
+            } else {
+                &RGBColor(170, 170, 170)
+            };
+
+            draw_node_square(
+                drawing_area,
+                row_idx,
+                column_idx,
+                cell_size,
+                left_margin,
+                top_margin,
+                pitch,
+                fill,
+                border,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn draw_node_square(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    row_idx: usize,
+    column_idx: usize,
+    cell_size: i32,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    fill: RGBColor,
+    border: &RGBColor,
+) -> Result<(), DancingLinksVisualizationError> {
+    let (x, y) =
+        node_origin(row_idx, column_idx, left_margin, top_margin, pitch);
+    drawing_area
+        .draw(&Rectangle::new(
+            [(x, y), (x + cell_size, y + cell_size)],
+            ShapeStyle::from(&fill).filled(),
+        ))
+        .map_err(|err| {
+            DancingLinksVisualizationError::Render(err.to_string())
+        })?;
+    drawing_area
+        .draw(&Rectangle::new(
+            [(x, y), (x + cell_size, y + cell_size)],
+            ShapeStyle::from(border).stroke_width(1),
+        ))
+        .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
+}
+
+fn node_origin(
+    row_idx: usize,
+    column_idx: usize,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+) -> (i32, i32) {
+    (
+        left_margin + (column_idx as i32 * pitch),
+        top_margin + (row_idx as i32 * pitch),
+    )
+}
+
+fn node_center(
+    row_idx: usize,
+    column_idx: usize,
+    left_margin: i32,
+    top_margin: i32,
+    pitch: i32,
+    cell_size: i32,
+) -> (i32, i32) {
+    let (x, y) =
+        node_origin(row_idx, column_idx, left_margin, top_margin, pitch);
+    (x + (cell_size / 2), y + (cell_size / 2))
+}
+
+fn find_active_cells(
+    table: &LinkedTable,
+    active_columns: &[bool; LINKED_TABLE_COLUMNS],
+) -> HashSet<(usize, usize)> {
+    let mut active_cells = HashSet::new();
+
+    for column_idx in 0..LINKED_TABLE_COLUMNS {
+        if !active_columns[column_idx] {
+            continue;
+        }
+
+        let Link::ColumnHeader(header) = table.table[0][column_idx] else {
+            continue;
+        };
+        let Some(mut row_idx) = header.down else {
+            continue;
+        };
+
+        while row_idx != 0 {
+            active_cells.insert((row_idx, column_idx));
+            row_idx = match table.table[row_idx][column_idx] {
+                Link::Cell(cell) => cell.down.unwrap_or(0),
+                _ => break,
+            };
+        }
+    }
+
+    active_cells
+}
+
 /// Hides the column at table[row_idx][column_idx], iteratively traverses the
 /// right pointer hiding each column until returning back to column_idx.
 fn hide_all_columns_in_row(
@@ -727,6 +1406,164 @@ fn launch_dancing_links(
     }
 
     solutions
+}
+
+pub fn visualize_dancing_links_search(
+    num_solutions: i32,
+    column_decision_strategy: DecisionStrategy,
+    row_decision_strategy: DecisionStrategy,
+    config: DancingLinksVisualizationConfig,
+) -> Result<DancingLinksVisualizationResult, DancingLinksVisualizationError> {
+    let mut solutions: Vec<[usize; 81]> =
+        Vec::with_capacity(num_solutions as usize);
+    let mut linked_table = generate_linked_table();
+    let mut active_columns = [true; LINKED_TABLE_COLUMNS];
+    let mut solution = Vec::with_capacity(81);
+    let mut decisions: Vec<Decision> = Vec::with_capacity(81);
+    let mut tracer = VisualizationTracer::new(config)?;
+
+    tracer.trace(
+        &linked_table,
+        &active_columns,
+        FrameContext {
+            label: "initialized".to_string(),
+            highlighted_column: None,
+            highlighted_row: None,
+            active_solution_rows: solution.clone(),
+        },
+    )?;
+
+    loop {
+        if active_columns.iter().all(|is_active| !is_active) {
+            tracer.trace(
+                &linked_table,
+                &active_columns,
+                FrameContext {
+                    label: format!("solution_{}", solutions.len() + 1),
+                    highlighted_column: None,
+                    highlighted_row: solution.last().copied(),
+                    active_solution_rows: solution.clone(),
+                },
+            )?;
+
+            solutions
+                .push(std::array::from_fn::<_, 81, _>(|i| solution[i] - 1));
+            backtrack(
+                &mut decisions,
+                &mut active_columns,
+                &mut solution,
+                &mut linked_table,
+                row_decision_strategy,
+            );
+            tracer.trace(
+                &linked_table,
+                &active_columns,
+                FrameContext {
+                    label: "backtrack_after_solution".to_string(),
+                    highlighted_column: decisions
+                        .last()
+                        .map(|decision| decision.selected_column),
+                    highlighted_row: solution.last().copied(),
+                    active_solution_rows: solution.clone(),
+                },
+            )?;
+        }
+
+        if solutions.len() >= num_solutions as usize {
+            break;
+        }
+
+        let selected_column = select_column(
+            &active_columns,
+            column_decision_strategy,
+            &linked_table,
+        );
+        tracer.trace(
+            &linked_table,
+            &active_columns,
+            FrameContext {
+                label: format!("select_column_{selected_column}"),
+                highlighted_column: Some(selected_column),
+                highlighted_row: None,
+                active_solution_rows: solution.clone(),
+            },
+        )?;
+
+        let mut candidate_rows =
+            match find_satisfying_rows(selected_column, &linked_table) {
+                Some(rows) => rows,
+                None => {
+                    backtrack(
+                        &mut decisions,
+                        &mut active_columns,
+                        &mut solution,
+                        &mut linked_table,
+                        DecisionStrategy::First,
+                    );
+                    tracer.trace(
+                        &linked_table,
+                        &active_columns,
+                        FrameContext {
+                            label: format!(
+                                "dead_end_backtrack_column_{selected_column}"
+                            ),
+                            highlighted_column: Some(selected_column),
+                            highlighted_row: solution.last().copied(),
+                            active_solution_rows: solution.clone(),
+                        },
+                    )?;
+                    continue;
+                }
+            };
+
+        let selected_row = pick_row(&mut candidate_rows, row_decision_strategy);
+        tracer.trace(
+            &linked_table,
+            &active_columns,
+            FrameContext {
+                label: format!("select_row_{selected_row}"),
+                highlighted_column: Some(selected_column),
+                highlighted_row: Some(selected_row),
+                active_solution_rows: solution.clone(),
+            },
+        )?;
+
+        let hidden_columns = hide_all_columns_in_row(
+            selected_row,
+            selected_column,
+            &mut linked_table,
+        );
+        for &column_idx in &hidden_columns {
+            active_columns[column_idx] = false;
+        }
+        solution.push(selected_row);
+        decisions.push(Decision {
+            selected_column,
+            selected_row,
+            potential_rows: candidate_rows,
+            hidden_columns,
+        });
+        tracer.trace(
+            &linked_table,
+            &active_columns,
+            FrameContext {
+                label: format!("cover_row_{selected_row}"),
+                highlighted_column: Some(selected_column),
+                highlighted_row: Some(selected_row),
+                active_solution_rows: solution.clone(),
+            },
+        )?;
+    }
+
+    Ok(DancingLinksVisualizationResult {
+        frames: tracer.frame_paths,
+        solutions: solutions
+            .into_iter()
+            .map(|solution_set| {
+                map_solution_set_to_board(&HashSet::from(solution_set))
+            })
+            .collect(),
+    })
 }
 
 pub fn advanced_get_sudoku_boards(
