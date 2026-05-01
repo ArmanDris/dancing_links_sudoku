@@ -8,6 +8,14 @@ readme = "README.md"
 repository = "https://github.com/ArmanDris/dancing_links_sudoku"
 keywords = ["sudoku", "dancing_links", "algorithm_x", "exact_cover"]
 categories = ["algorithms"]
+exclude = [
+  "AGENTS.md",
+  "COMMAND_CHEATSHEET.md",
+  "commit_directory.sh",
+  "get_review_comments.sh",
+  "test_then_publish_pr.sh",
+  "human_v_agent_quality_notes/*",
+]
 
 [dependencies]
 rand = "0.8"
