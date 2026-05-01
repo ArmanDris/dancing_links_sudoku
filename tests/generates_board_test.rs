@@ -1,10 +1,11 @@
-use dancing_links_sudoku::Board;
-use dancing_links_sudoku::DecisionStrategy;
-use dancing_links_sudoku::launch_algorithm_x;
+use dancing_links_sudoku::{
+    DecisionStrategy, advanced_get_sudoku_boards, get_sudoku_boards,
+};
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn it_generates_a_board() {
-    let solutions = launch_algorithm_x(None, None, None);
+    let solutions = get_sudoku_boards(1);
     let board = solutions.first().unwrap();
 
     let mut num_zero = 0;
@@ -19,13 +20,14 @@ fn it_generates_a_board() {
     assert_eq!(num_zero, 0);
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 fn it_generates_many_sequential_boards() {
     const NUM_SOLUTIONS: usize = 10;
-    let solutions = launch_algorithm_x(
-        Some(Board::new()),
-        Some(DecisionStrategy::First),
-        Some(NUM_SOLUTIONS),
+    let solutions = advanced_get_sudoku_boards(
+        10,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
     );
 
     assert_eq!(solutions.len(), NUM_SOLUTIONS);

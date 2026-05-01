@@ -16,3 +16,6 @@ getrandom = { version = "0.2", optional=true }
 [features]
 default = []
 js-random = ["getrandom/js"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.70"
