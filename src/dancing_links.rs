@@ -43,11 +43,19 @@ const LINKED_TABLE_ROWS: usize = 730;
 struct LinkedTable {
     table: Box<[[Link; LINKED_TABLE_COLUMNS]; LINKED_TABLE_ROWS]>,
 }
-/// Strategy to select the next column in Dancing Links search
+
+/// One of `First`, `Random`, and `Optimal`. Can be passed to
+/// `advanced_get_sudoku_boards` to specify how rows/columns are selected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecisionStrategy {
+    /// Return the first valid column/row.
     First,
+    /// Return a random row/column from the set of valid ones.
     Random,
+    /// Return the optimal row/column.
+    ///
+    /// In the column case this is by selecting the column with the fewest
+    /// cells. In the row case we just return the first possible row.
     Optimal,
 }
 
@@ -729,6 +737,8 @@ fn launch_dancing_links(
     solutions
 }
 
+///Generates `num_solutions` sudoku boards. See DecisionStrategy docs to
+/// understand how those options influence board generation.
 pub fn advanced_get_sudoku_boards(
     num_solutions: i32,
     column_decision_strategy: DecisionStrategy,
@@ -744,6 +754,10 @@ pub fn advanced_get_sudoku_boards(
     .collect()
 }
 
+/// Generates `num_solutions` sudoku boards.
+///
+/// Uses an optimal column selection strategy, and a random row selection
+/// strategy for a mix of randomness and breadth.
 pub fn get_sudoku_boards(num_solutions: i32) -> Vec<Board> {
     launch_dancing_links(
         num_solutions,
