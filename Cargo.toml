@@ -1,6 +1,6 @@
 [package]
 name = "dancing_links_sudoku"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 description = "Generates Sudoku boards using the dancing links algorithm"
