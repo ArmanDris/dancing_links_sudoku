@@ -1,10 +1,12 @@
 # Dancing Links Sudoku
 
-A Rust implementation of the most efficent sudoku solving algorithm: Dancing
-Links.
+A Rust library for efficently generating Sudoku boards using the Dancing Links
+algorithm.
+
+Watch a visualization of the algorithm generating a board [here](https://www.youtube.com/watch?v=dGBS9GXpn_w).
+
 
 ### Performance
-
 
 | Algorithm           |  Time per Board     |
 |---------------------|---------------------|
@@ -12,7 +14,42 @@ Links.
 | Depth First Search  | **0.374 ms**        |
 | Algorithm X         | **253 ms**          |
 
-### The Algorithm
+
+### Usage
+
+This library is super simple, there are only two functions: 
+`get_sudoku_boards`, and `advanced_get_sudoku_boards`. You can use them like
+this:
+
+```rs
+use dancing_links_sudoku::{
+    DecisionStrategy,
+    advanced_get_sudoku_boards,
+    get_sudoku_boards,
+};
+
+fn main() {
+    // Generate & print 10 Sudoku boards
+    let boards = get_sudoku_boards(10);
+    for board in boards {
+        board.print_board();
+    }
+
+    // Deterministically generate 5 boards:
+    let sequential_boards = advanced_get_sudoku_boards(
+        5,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
+    );
+    for board in sequential_boards {
+        board.print_board();
+    }
+}
+```
+
+For the full library details [consult the docs](https://docs.rs/dancing_links_sudoku/latest/dancing_links_sudoku/).
+
+### Rough overview of the Algorithm
 
 Dancing Links requires reducing the problem to and from an [exact cover problem](https://en.wikipedia.org/wiki/Exact_cover#Incidence_matrix).
 
