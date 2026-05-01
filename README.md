@@ -47,7 +47,7 @@ fn main() {
 }
 ```
 
-For the full library details [consult the docs](https://docs.rs/dancing_links_sudoku/latest/dancing_links_sudoku/).
+For all the details [consult the docs](https://docs.rs/dancing_links_sudoku/latest/dancing_links_sudoku/).
 
 ### Rough overview of the Algorithm
 
