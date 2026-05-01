@@ -15,6 +15,7 @@ exclude = [
   "get_review_comments.sh",
   "test_then_publish_pr.sh",
   "human_v_agent_quality_notes/*",
+  "benchmarks.md",
 ]
 
 [dependencies]
