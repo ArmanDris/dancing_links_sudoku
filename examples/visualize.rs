@@ -7,7 +7,7 @@ fn main() {
     let result = visualize_dancing_links_search(
         1,
         DancingLinksDecisionStrategy::Optimal,
-        DancingLinksDecisionStrategy::Optimal,
+        DancingLinksDecisionStrategy::Random,
         DancingLinksVisualizationConfig::new("tmp/dlx_frames"),
     )
     .unwrap();

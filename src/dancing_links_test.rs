@@ -4,6 +4,34 @@ use std::{collections::HashSet, fs};
 use super::*;
 use crate::algorithm_x::generate_constraint_table;
 
+fn assert_board_is_solved_and_valid(board: &Board) {
+    for row_idx in 0..9 {
+        let row = board.get_row(row_idx);
+        let mut sorted_row = row.to_vec();
+        sorted_row.sort_unstable();
+        assert_eq!(sorted_row, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    for column_idx in 0..9 {
+        let mut column = board.get_column(column_idx).to_vec();
+        column.sort_unstable();
+        assert_eq!(column, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    for subgrid_y in (0..9).step_by(3) {
+        for subgrid_x in (0..9).step_by(3) {
+            let mut subgrid = Vec::with_capacity(9);
+            for y in subgrid_y..subgrid_y + 3 {
+                for x in subgrid_x..subgrid_x + 3 {
+                    subgrid.push(board.get(x, y));
+                }
+            }
+            subgrid.sort_unstable();
+            assert_eq!(subgrid, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        }
+    }
+}
+
 #[test]
 fn it_can_construct_an_empty_table() {
     let mut left = true;
@@ -1479,6 +1507,30 @@ fn linked_row_indexes_are_offset_by_column_header_row() {
 }
 
 #[test]
+fn solution_rows_map_to_expected_board_cells() {
+    let board = build_partial_board(&[1, 11, 729]);
+
+    assert_eq!(board.get(0, 0), 1);
+    assert_eq!(board.get(1, 0), 2);
+    assert_eq!(board.get(8, 8), 9);
+}
+
+#[test]
+fn preview_board_mapping_matches_solver_solution_rows() {
+    let exact_cover_solution = launch_dancing_links(
+        1,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
+    )[0];
+    let linked_solution_rows: Vec<usize> =
+        exact_cover_solution.iter().map(|row| row + 1).collect();
+
+    let preview_board = build_partial_board(&linked_solution_rows);
+
+    assert_board_is_solved_and_valid(&preview_board);
+}
+
+#[test]
 fn it_renders_visualization_frames() {
     let output_dir = std::env::temp_dir().join(format!(
         "dancing_links_visualization_test_{}",
@@ -1503,6 +1555,52 @@ fn it_renders_visualization_frames() {
     for frame in &result.frames {
         assert!(frame.exists(), "missing frame {}", frame.display());
     }
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
+fn final_visualization_frame_is_a_valid_solved_board() {
+    let output_dir = std::env::temp_dir().join(format!(
+        "dancing_links_visualization_solution_test_{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&output_dir);
+
+    let result = visualize_dancing_links_search(
+        1,
+        DecisionStrategy::First,
+        DecisionStrategy::First,
+        DancingLinksVisualizationConfig {
+            output_dir: output_dir.clone(),
+            ..DancingLinksVisualizationConfig::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.solutions.len(), 1);
+    let solved_board = &result.solutions[0];
+    assert_board_is_solved_and_valid(solved_board);
+
+    let last_frame = result.frames.last().expect("expected at least one frame");
+    assert!(
+        last_frame
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.contains("solution_1")),
+        "last frame should be the solved board, got {}",
+        last_frame.display()
+    );
+
+    let svg_contents = fs::read_to_string(last_frame).unwrap();
+    assert!(
+        svg_contents.contains("Step: solution_1"),
+        "last svg should be labeled as the solved frame"
+    );
+    assert!(
+        svg_contents.contains("Sudoku Preview"),
+        "last svg should include the sudoku preview panel"
+    );
 
     fs::remove_dir_all(output_dir).unwrap();
 }

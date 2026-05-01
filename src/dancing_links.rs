@@ -88,8 +88,8 @@ impl Default for DancingLinksVisualizationConfig {
         Self {
             output_dir: PathBuf::from("dancing_links_frames"),
             max_frames: None,
-            cell_size: 14,
-            cell_gap: 8,
+            cell_size: 10,
+            cell_gap: 2,
             include_hidden_cells: true,
         }
     }
@@ -707,10 +707,16 @@ fn render_table_frame(
     let pitch = cell_size + cell_gap;
     let left_margin = 80i32;
     let top_margin = 100i32;
+    let board_panel_padding = 180i32;
+    let board_size =
+        ((height_for_board(LINKED_TABLE_ROWS as i32, pitch) as f64) * 0.34)
+            .round() as i32;
+    let board_panel_width = board_size + (board_panel_padding * 2);
     let right_margin = 80i32;
     let bottom_margin = 80i32;
     let width = (left_margin
         + right_margin
+        + board_panel_width
         + (LINKED_TABLE_COLUMNS as i32 * pitch)) as u32;
     let height = (top_margin
         + bottom_margin
@@ -753,10 +759,21 @@ fn render_table_frame(
         pitch,
         cell_size,
     )?;
+    draw_sudoku_preview(
+        &drawing_area,
+        context,
+        left_margin + (LINKED_TABLE_COLUMNS as i32 * pitch) + right_margin,
+        top_margin,
+        board_size,
+    )?;
 
     drawing_area
         .present()
         .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
+}
+
+fn height_for_board(row_count: i32, pitch: i32) -> i32 {
+    100 + 80 + (row_count * pitch)
 }
 
 fn draw_frame_annotations(
@@ -874,6 +891,7 @@ fn draw_header_pointer_lines(
                 cell_size,
             ),
             &BLUE.mix(0.5),
+            cell_size,
         )?;
     }
     if let Some(target_column) = header.left.filter(|col| active_columns[*col])
@@ -890,6 +908,7 @@ fn draw_header_pointer_lines(
                 cell_size,
             ),
             &RGBColor(222, 140, 74).mix(0.5),
+            cell_size,
         )?;
     }
     if let Some(target_row) = header.down.filter(|row| *row != 0) {
@@ -905,6 +924,7 @@ fn draw_header_pointer_lines(
                 cell_size,
             ),
             &RED.mix(0.35),
+            cell_size,
         )?;
     }
     if let Some(target_row) = header.up.filter(|row| *row != 0) {
@@ -920,6 +940,7 @@ fn draw_header_pointer_lines(
                 cell_size,
             ),
             &GREEN.mix(0.35),
+            cell_size,
         )?;
     }
 
@@ -965,6 +986,7 @@ fn draw_cell_pointer_lines(
                 cell_size,
             ),
             &BLUE.mix(0.35),
+            cell_size,
         )?;
     }
     if let Some(target_column) = cell.left.filter(|target_column| {
@@ -982,6 +1004,7 @@ fn draw_cell_pointer_lines(
                 cell_size,
             ),
             &RGBColor(222, 140, 74).mix(0.35),
+            cell_size,
         )?;
     }
     if let Some(target_row) = cell.up.filter(|target_row| {
@@ -1008,7 +1031,13 @@ fn draw_cell_pointer_lines(
                 cell_size,
             )
         };
-        draw_colored_line(drawing_area, start, end, &GREEN.mix(0.35))?;
+        draw_colored_line(
+            drawing_area,
+            start,
+            end,
+            &GREEN.mix(0.35),
+            cell_size,
+        )?;
     }
     if let Some(target_row) = cell.down.filter(|target_row| {
         *target_row == 0
@@ -1034,7 +1063,7 @@ fn draw_cell_pointer_lines(
                 cell_size,
             )
         };
-        draw_colored_line(drawing_area, start, end, &RED.mix(0.35))?;
+        draw_colored_line(drawing_area, start, end, &RED.mix(0.35), cell_size)?;
     }
 
     Ok(())
@@ -1045,11 +1074,13 @@ fn draw_colored_line<C: Color>(
     start: (i32, i32),
     end: (i32, i32),
     color: &C,
+    cell_size: i32,
 ) -> Result<(), DancingLinksVisualizationError> {
+    let stroke_width = ((cell_size * 3) / 4).max(1) as u32;
     drawing_area
         .draw(&PathElement::new(
             vec![start, end],
-            ShapeStyle::from(color).stroke_width(1),
+            ShapeStyle::from(color).stroke_width(stroke_width),
         ))
         .map_err(|err| DancingLinksVisualizationError::Render(err.to_string()))
 }
@@ -1150,6 +1181,166 @@ fn draw_nodes(
     }
 
     Ok(())
+}
+
+fn draw_sudoku_preview(
+    drawing_area: &DrawingArea<SVGBackend<'_>, plotters::coord::Shift>,
+    context: &FrameContext,
+    panel_x: i32,
+    panel_y: i32,
+    board_size: i32,
+) -> Result<(), DancingLinksVisualizationError> {
+    let board = build_partial_board(&context.active_solution_rows);
+    let selected_placement = context
+        .highlighted_row
+        .and_then(map_solution_row_to_placement);
+    let cell_size = board_size / 9;
+    let board_right = panel_x + board_size;
+    let board_bottom = panel_y + board_size;
+
+    drawing_area
+        .draw(&Text::new(
+            "Sudoku Preview",
+            (panel_x, panel_y - 48),
+            ("sans-serif", 72).into_font(),
+        ))
+        .map_err(|err| {
+            DancingLinksVisualizationError::Render(err.to_string())
+        })?;
+    drawing_area
+        .draw(&Text::new(
+            "Current partial board from selected exact-cover rows",
+            (panel_x, panel_y - 8),
+            ("sans-serif", 34).into_font(),
+        ))
+        .map_err(|err| {
+            DancingLinksVisualizationError::Render(err.to_string())
+        })?;
+
+    drawing_area
+        .draw(&Rectangle::new(
+            [(panel_x, panel_y), (board_right, board_bottom)],
+            ShapeStyle::from(&WHITE).filled(),
+        ))
+        .map_err(|err| {
+            DancingLinksVisualizationError::Render(err.to_string())
+        })?;
+
+    for row_idx in 0..9 {
+        for column_idx in 0..9 {
+            let x = panel_x + (column_idx * cell_size);
+            let y = panel_y + (row_idx * cell_size);
+            let is_selected = selected_placement
+                .map(|(x_pos, y_pos, _)| {
+                    x_pos == column_idx as usize && y_pos == row_idx as usize
+                })
+                .unwrap_or(false);
+            let fill = if is_selected {
+                RGBColor(255, 232, 181)
+            } else if ((row_idx / 3) + (column_idx / 3)) % 2 == 0 {
+                RGBColor(248, 248, 248)
+            } else {
+                RGBColor(235, 235, 235)
+            };
+
+            drawing_area
+                .draw(&Rectangle::new(
+                    [(x, y), (x + cell_size, y + cell_size)],
+                    ShapeStyle::from(&fill).filled(),
+                ))
+                .map_err(|err| {
+                    DancingLinksVisualizationError::Render(err.to_string())
+                })?;
+
+            let value = board.get(column_idx as usize, row_idx as usize);
+            if value != 0 {
+                let text_x = x + (cell_size / 2) - (cell_size / 8);
+                let text_y = y + (cell_size / 2) + (cell_size / 10);
+                drawing_area
+                    .draw(&Text::new(
+                        value.to_string(),
+                        (text_x, text_y),
+                        ("sans-serif", (cell_size / 2).max(24)).into_font(),
+                    ))
+                    .map_err(|err| {
+                        DancingLinksVisualizationError::Render(err.to_string())
+                    })?;
+            }
+        }
+    }
+
+    for idx in 0..=9 {
+        let weight = if idx % 3 == 0 { 8 } else { 3 };
+        let x = panel_x + (idx * cell_size);
+        let y = panel_y + (idx * cell_size);
+
+        drawing_area
+            .draw(&PathElement::new(
+                vec![(x, panel_y), (x, board_bottom)],
+                ShapeStyle::from(&BLACK).stroke_width(weight),
+            ))
+            .map_err(|err| {
+                DancingLinksVisualizationError::Render(err.to_string())
+            })?;
+        drawing_area
+            .draw(&PathElement::new(
+                vec![(panel_x, y), (board_right, y)],
+                ShapeStyle::from(&BLACK).stroke_width(weight),
+            ))
+            .map_err(|err| {
+                DancingLinksVisualizationError::Render(err.to_string())
+            })?;
+    }
+
+    if let Some((cell_x, cell_y, value)) = selected_placement {
+        drawing_area
+            .draw(&Text::new(
+                format!(
+                    "Latest placement: r{} c{} = {}",
+                    cell_y + 1,
+                    cell_x + 1,
+                    value
+                ),
+                (panel_x, board_bottom + 64),
+                ("sans-serif", 42).into_font(),
+            ))
+            .map_err(|err| {
+                DancingLinksVisualizationError::Render(err.to_string())
+            })?;
+    }
+
+    Ok(())
+}
+
+fn build_partial_board(solution_rows: &[usize]) -> Board {
+    let mut board = Board::new();
+
+    for &solution_row in solution_rows {
+        if let Some((cell_x, cell_y, value)) =
+            map_solution_row_to_placement(solution_row)
+        {
+            board.set(cell_x, cell_y, value);
+        }
+    }
+
+    board
+}
+
+fn map_solution_row_to_placement(
+    solution_row: usize,
+) -> Option<(usize, usize, i32)> {
+    if solution_row == 0 || solution_row > 729 {
+        return None;
+    }
+
+    let constraint_row = solution_row - 1;
+
+    let value = (constraint_row % 9 + 1) as i32;
+    let sequential_cell_index = constraint_row / 9;
+    let cell_x = sequential_cell_index % 9;
+    let cell_y = sequential_cell_index / 9;
+
+    Some((cell_x, cell_y, value))
 }
 
 fn draw_node_square(
@@ -1448,6 +1639,9 @@ pub fn visualize_dancing_links_search(
 
             solutions
                 .push(std::array::from_fn::<_, 81, _>(|i| solution[i] - 1));
+            if solutions.len() >= num_solutions as usize {
+                break;
+            }
             backtrack(
                 &mut decisions,
                 &mut active_columns,
